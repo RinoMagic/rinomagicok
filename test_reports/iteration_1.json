@@ -1,0 +1,28 @@
+{
+  "summary": "Full backend + frontend E2E testing of Schedina Bar (React PWA + FastAPI + MongoDB Atlas). Backend: 19/19 pytest passed covering auth (QA player/admin, /auth/me, wrong password), Serie A reference (38 matchdays, 20 teams, 10 matches/md, players pagination/role/search), full Tiket flow (admin create round → player submits schedina with big-match bonus → admin sets results → verified 12 pts = 9 normal + 3 big-with-bonus, standings correct), full Survival flow (create tournament → join → pick → invalid pick 400 → resolve → matchday advance, used_teams tracked, re-use blocked), and PWA (manifest.json, sw.js, icon-192/512, VAPID public key, /api/push/subscribe requires auth). Frontend: Login OK for both QA accounts, Home shows 4 game cards (Tiket & Survival active; SCORE&LIVE + FANTAGIORNATA with PROSSIMAMENTE badges), bottom nav to Tiket/Survival/Calendario/Giocatori works, Calendario md=2 shows 10 matches, Giocatori search+role filter works (role=P → 59 portieri), Tiket admin panel opens and shows md/deadline/bigmatch controls, Survival admin panel opens with create form. Logout works. No QR/Expo screens anywhere.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py line 212-217: deadline parse silently swallows non-ISO exceptions (except Exception: pass). Consider stricter validation on round creation instead of at submit-time.",
+    "auth.py: JWT_SECRET is required from env — good. However CORS is currently allow_origins='*' with allow_credentials=False; acceptable for Bearer-token auth but tighten origins in production.",
+    "server.py tiket_submit does not enforce that all 10 fixtures are predicted — a player can submit partial predictions. UI enforces 'allFilled', but backend should validate len(predictions) == len(fixtures) for defense in depth.",
+    "survival_resolve does not verify body.matchday == tournament.current_matchday, so an admin could resolve arbitrary matchdays. Consider adding a guard.",
+    "No index on (round_id, user_id) for tiket_schedine or (tournament_id, user_id, matchday) for sv_picks — add unique indexes for correctness under concurrency.",
+    "clean() mutates the input dict via pop — callers pass the same dict that was inserted (e.g. tiket_create_round inserts dict(rnd) then returns clean(rnd) which is fine since dict() copies; verified). Fine but worth noting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_backend.py (new)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% of tested flows"},
+  "test_credentials": "QA player e1_qa_player/Test1234! and QA admin e1_qa_admin/Test1234! from /app/memory/test_credentials.md",
+  "seed_data_creation": "Tests create real docs in tiket_rounds/tiket_schedine and sv_games/sv_entries/sv_picks in Atlas. Each run picks the next unused matchday for Tiket, and creates a fresh Survival tournament named TEST_SV_<timestamp>. Season data (sal_calendar/sal_players/users) untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_backend.py runs in ~11s and picks fresh matchdays automatically. Login uses 'identifier' (not 'email'). Bearer token in Authorization header. Frontend uses REACT_APP_BACKEND_URL. Prossimamente text is uppercased via CSS (visible as 'PROSSIMAMENTE'). All key elements have data-testid. Every run of Tiket flow consumes one matchday (max 38); consider a cleanup step if reaching the limit.",
+  "rca of the issue": "n/a — no bugs found"
+}

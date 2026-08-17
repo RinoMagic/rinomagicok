@@ -1,0 +1,113 @@
+{
+  "theme": "dark",
+  "archetype": "ARCHETYPE 2: THE PERFORMANCE PRO",
+  "design_strategy": "A high-visibility 'Tactical' look for sports betting. Deep Obsidian base, Pure White data clarity, and Azzurri Blue/Neon Green triggers. Focus on high-contrast accessibility, token-based theming, and streamlined interaction patterns.",
+  "typography": {
+    "headings": {
+      "fontFamily": "'Bebas Neue', sans-serif",
+      "strategy": "Strong Condensed Sans for a heavy-weight athletic feel. Use uppercase, tight letter spacing.",
+      "sizes": {
+        "h1": "text-4xl sm:text-5xl lg:text-6xl",
+        "h2": "text-2xl sm:text-3xl lg:text-4xl",
+        "h3": "text-xl sm:text-2xl",
+        "h4": "text-lg sm:text-xl"
+      }
+    },
+    "body": {
+      "fontFamily": "'Manrope', sans-serif",
+      "strategy": "Clean Geometric Sans with increased tracking for legibility on dense data views.",
+      "sizes": {
+        "base": "text-base",
+        "small": "text-sm",
+        "tiny": "text-xs tracking-[0.2em] uppercase"
+      }
+    },
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap"
+  },
+  "colors": {
+    "background": {
+      "base": "#0A0A0A",
+      "surface": "#141414",
+      "surface_elevated": "#1F1F1F"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#52525B"
+    },
+    "brand": {
+      "primary": "#0057B8",
+      "primary_hover": "#00438F",
+      "accent": "#E32221",
+      "success": "#00FF66"
+    },
+    "borders": {
+      "default": "rgba(255, 255, 255, 0.1)",
+      "focus": "#0057B8"
+    }
+  },
+  "layouts": {
+    "spacing_strategy": "Generous Spacing for outer containers (p-6, p-8), high density for data grids (gap-4).",
+    "dashboard_grid": "MODE B: High Density Grid. grid-cols-1 md:grid-cols-2 lg:grid-cols-4. Every pixel utilized.",
+    "cards": "Sharp edges (rounded-sm or rounded-none). Flat background, 1px subtle border (border-white/10), NO shadow.",
+    "navigation": "Mobile-first bottom navigation bar using Crystal Glassmorphism (backdrop-blur-xl bg-black/80 border-t border-white/10)."
+  },
+  "components": {
+    "buttons": "Tactical Minimalism. Sharp corners (rounded-sm). High saturation for primary actions. Hover state must explicitly set text color.",
+    "bet_toggles": "For 1/X/2 options, use segmented controls with pure white text and Neon Green (#00FF66) active state backgrounds or borders.",
+    "badges": "For 'Prossimamente', use uppercase, tiny text (text-xs), tracking-[0.2em], with a muted background.",
+    "lists": "Dense lists for Calendar and Players. 1px bottom border to separate rows."
+  },
+  "visual_enhancers": {
+    "glassmorphism": "Use ONLY for Sticky Headers, Bottom Nav, and Modals. Higher opacity (bg-black/60) + heavy blur (backdrop-blur-xl) + 1px delicate inner stroke.",
+    "textures": "Subtle noise overlay (opacity-5) on the main background to prevent digital flatness."
+  },
+  "motion": {
+    "interactions": "Fast, snappy micro-interactions. No slow floats.",
+    "transitions": "Use specific properties (e.g., transition-colors duration-200), NEVER transition-all."
+  },
+  "accessibility": {
+    "contrast": "Ensure minimum 4.5:1 ratio for body text.",
+    "focus": "focus:ring-2 focus:ring-[#0057B8] focus:outline-none.",
+    "testing": "All interactive elements MUST include data-testid attribute (e.g., data-testid='login-submit-button')."
+  },
+  "media": {
+    "image_urls": {
+      "login_background": {
+        "url": "https://images.pexels.com/photos/32190700/pexels-photo-32190700.jpeg",
+        "description": "Dynamic action during a nighttime football match with players competing intensely on the field. Use with heavy dark overlay (bg-black/70)."
+      },
+      "stadium_atmosphere": {
+        "url": "https://images.pexels.com/photos/30651230/pexels-photo-30651230.jpeg",
+        "description": "A crowded soccer stadium under bright lights at night. Good for dashboard headers or banners."
+      },
+      "football_abstract": {
+        "url": "https://images.pexels.com/photos/38105639/pexels-photo-38105639.jpeg",
+        "description": "A soccer ball resting on a grass field at nightfall. Useful for generic empty states."
+      }
+    },
+    "icons": "lucide-react"
+  },
+  "3d_libraries": {
+    "strategy": "Not required. Focus on high-performance 2D density suitable for mobile PWA betting apps."
+  },
+  "instructions_to_main_agent": [
+    "This is a hybrid fullstack PWA. The UI MUST be in Italian.",
+    "Replicate 'Schedina Bar' functionalities: Login, Dashboard (4 games), Tiket, Survival, Calendar, Players.",
+    "ScoreAndLive and FantaGiornata MUST be visually present on the dashboard but inactive, clearly marked with a 'Prossimamente' banner/badge.",
+    "Use standard React web app structure (NOT React Native/Expo).",
+    "Avoid generic Tailwind templates. Apply the 'Performance Pro' archetype precisely.",
+    "Do not use generic 'Inter' for headings; apply 'Bebas Neue' or similar condensed sans.",
+    "Implement Shadcn UI for forms, toggles, dialogs, but strip Vercel-look to match the tactical dark theme.",
+    "Ensure the layout is highly mobile-optimized (Mobile-first responsive)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use transparent backgrounds without blur/scrim for text readability.",
+    "DO NOT apply universal transitions (transition: all).",
+    "DO NOT center align the app container (.App { text-align: center; }).",
+    "NEVER use placeholder URLs (via.placeholder.com). Use the provided image_urls.",
+    "Every interaction needs micro-animations (hover states, focus).",
+    "All interactive elements MUST include data-testid.",
+    "Use sonner for toast notifications."
+  ]
+}
