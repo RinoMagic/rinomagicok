@@ -349,6 +349,7 @@ def build_router(
         }
 
         if dry_run:
+            result["rows"] = rows
             return result
 
         now = _now()
@@ -457,6 +458,7 @@ def build_router(
             **summary,
         }
         if dry_run:
+            result["rows"] = rows
             return result
 
         now = _now()

@@ -50,7 +50,11 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 ## Status
 - Tutti i 4 giochi (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus attivi sul web.
 
-## Implemented — iteration 4 (2026-06)
+## Implemented — iteration 5 (2026-06)
+- Import Voti Guidato: upload PDF/Excel in `dry_run` → anteprima tabellare giocatore→voto (rows aggiunte alla risposta dry_run) → "Conferma e salva" (`dry_run=false&replace=true`).
+- Notifiche Automatiche: task asyncio di startup che scandisce `matchday_deadlines` → broadcast "Nuova giornata aperta" per scadenze future non ancora notificate e promemoria "Ultimi minuti" entro 60' (le scadenze passate vengono solo marcate, niente spam).
+- Esporta Storico PDF: modulo `exports.py` (`POST /api/export/pdf`, reportlab, admin) + helper frontend `apiDownload`; pulsanti in Survival, ScoreAndLive e FantaGiornata scaricano riepilogo + classifica di giornata.
+- Verified: testing agent iteration_6 — backend 18/18, frontend ~95% (nessun bug; unico limite di test su URL FG errato, endpoint export verificato 200 application/pdf).
 - Storico Giornate: ScoreAndLive (`/sal/.../history`), Survival (selettore giornata + `/matchdays/{id}/summary`), FantaGiornata (scheda Punteggi con `/results/{md}`). Tiket: la classifica stanza è il risultato di giornata.
 - Punteggi FantaGiornata: scheda "Punteggi" con `total_fantavoto` per membro + breakdown; admin "Calcola punti" (`POST /fg/leagues/{id}/settle`) dai voti caricati.
 - Notifiche Mirate: `BroadcastIn.user_ids` + `broadcast_push` filtrato; componente NotifyBox (admin) in Tiket room, Survival, ScoreAndLive e FantaGiornata invia push solo ai partecipanti dell'entità.

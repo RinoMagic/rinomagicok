@@ -47,8 +47,7 @@ export async function api(path, opts = {}) {
   return data;
 }
 
-export async function apiUpload(path, file, params = {}) {
-  const form = new FormData();
+export async function apiUpload(path, file, params = {}) {  const form = new FormData();
   form.append("file", file, file.name);
   const qs = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
   const t = getToken();
@@ -61,4 +60,24 @@ export async function apiUpload(path, file, params = {}) {
   const data = ct.includes("application/json") ? await res.json() : await res.text();
   if (!res.ok) throw new Error(extractError(res.status, data));
   return data;
+}
+
+export async function apiDownload(path, body, filename = "download.pdf") {
+  const t = getToken();
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const ct = res.headers.get("content-type") || "";
+    const data = ct.includes("application/json") ? await res.json() : await res.text();
+    throw new Error(extractError(res.status, data));
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }

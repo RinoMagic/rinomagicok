@@ -59,16 +59,27 @@ export default function Admin() {
     } catch (e) { toast.error(e.message); }
   };
 
-  const upload = async (ref, path, label) => {
+  const [votiPreview, setVotiPreview] = useState(null);
+  const previewVoti = async (ref, path) => {
     const f = ref.current?.files?.[0];
     if (!f) return;
     setBusy(true);
     try {
-      const r = await apiUpload(path, f, { matchday: md, season: SEASON });
-      toast.success(`${label} importato (giornata ${md})`);
-      console.log(r);
+      const r = await apiUpload(path, f, { dry_run: true });
+      setVotiPreview({ rows: r.rows || [], matchday: r.matchday, players: r.players, path, file: f });
+      toast.success(`Anteprima: ${r.players} giocatori · giornata ${r.matchday}`);
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); if (ref.current) ref.current.value = ""; }
+  };
+  const confirmVoti = async () => {
+    if (!votiPreview) return;
+    setBusy(true);
+    try {
+      await apiUpload(votiPreview.path, votiPreview.file, { dry_run: false, replace: true });
+      toast.success(`Voti giornata ${votiPreview.matchday} salvati`);
+      setVotiPreview(null);
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); }
   };
 
   const loadSettleState = async () => {
@@ -114,13 +125,40 @@ export default function Admin() {
         <button data-testid="admin-bc-send" onClick={broadcast} disabled={!title || !bodyMsg} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2 disabled:opacity-50">Invia a tutti</button>
       </Card>
 
-      <Card icon={FileText} title="Import Voti (PDF / Excel)">
+      <Card icon={FileText} title="Import Voti (PDF / Excel) — con anteprima">
         <div className="flex gap-2 flex-wrap">
-          <input ref={pdfRef} data-testid="admin-pdf" type="file" accept="application/pdf" onChange={() => upload(pdfRef, "/admin/voti/upload-pdf", "PDF voti")} className="hidden" />
-          <button onClick={() => pdfRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Carica PDF voti</button>
-          <input ref={xlsxRef} data-testid="admin-xlsx" type="file" accept=".xlsx" onChange={() => upload(xlsxRef, "/admin/voti/upload-xlsx", "Excel voti")} className="hidden" />
-          <button onClick={() => xlsxRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Carica Excel voti</button>
+          <input ref={pdfRef} data-testid="admin-pdf" type="file" accept="application/pdf" onChange={() => previewVoti(pdfRef, "/admin/voti/upload-pdf")} className="hidden" />
+          <button onClick={() => pdfRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Anteprima da PDF</button>
+          <input ref={xlsxRef} data-testid="admin-xlsx" type="file" accept=".xlsx" onChange={() => previewVoti(xlsxRef, "/admin/voti/upload-xlsx")} className="hidden" />
+          <button onClick={() => xlsxRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Anteprima da Excel</button>
         </div>
+        {votiPreview && (
+          <div className="mt-2 space-y-2">
+            <div className="text-sm text-[#94A3B8]">Giornata <b className="text-white">{votiPreview.matchday}</b> · {votiPreview.players} giocatori rilevati. Controlla e conferma.</div>
+            <div className="rounded-lg bg-[#0F1216] border border-white/10 max-h-72 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-[#94A3B8] sticky top-0 bg-[#0F1216]">
+                  <tr><th className="text-left px-3 py-2">Giocatore</th><th className="text-left px-3 py-2">Squadra</th><th className="px-2 py-2">R</th><th className="px-2 py-2">Voto</th><th className="px-2 py-2">Gol</th></tr>
+                </thead>
+                <tbody>
+                  {votiPreview.rows.map((r, i) => (
+                    <tr key={i} data-testid={`voti-row-${i}`} className="border-t border-white/5">
+                      <td className="px-3 py-1.5">{r.player_name}</td>
+                      <td className="px-3 py-1.5 text-[#94A3B8]">{r.team}</td>
+                      <td className="px-2 py-1.5 text-center">{r.role}</td>
+                      <td className="px-2 py-1.5 text-center font-bold text-[#F59E0B]">{r.sv ? "s.v." : r.voto}</td>
+                      <td className="px-2 py-1.5 text-center">{r.total_goals || ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2">
+              <button data-testid="voti-confirm" onClick={confirmVoti} disabled={busy} className="bg-[#00D95F] text-[#08110A] font-bold text-sm rounded-md px-4 py-2 disabled:opacity-50">Conferma e salva</button>
+              <button data-testid="voti-cancel" onClick={() => setVotiPreview(null)} className="border border-white/15 rounded-md px-4 py-2 text-sm">Annulla</button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card icon={Gavel} title="Liquidazione risultati">

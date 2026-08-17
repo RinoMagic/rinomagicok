@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Heart, Skull, Send, Copy, Trophy, BarChart3 } from "lucide-react";
-import { api } from "@/lib/api";
+import { ChevronLeft, Heart, Skull, Send, Copy, Trophy, BarChart3, FileDown } from "lucide-react";
+import { api, apiDownload } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
 import NotifyBox from "@/components/NotifyBox";
@@ -72,6 +72,23 @@ export default function ScoreAndLiveDetail() {
 
   if (loading || !t) return <div className="py-16 text-center text-[#94A3B8]">Caricamento...</div>;
   const parts = t.participants || [];
+  const exportPdf = async () => {
+    const sections = [{
+      heading: "Classifica",
+      columns: ["#", "Giocatore", "Vite/Stato"],
+      rows: parts.map((p, i) => [i + 1, p.nickname, p.eliminated_at_matchday != null ? `Fuori G${p.eliminated_at_matchday}` : `${p.lives_remaining} vite`]),
+    }];
+    if (summary?.fixtures) {
+      sections.push({
+        heading: "Riepilogo marcatori",
+        columns: ["Partita", "Marcatori scelti"],
+        rows: summary.fixtures.map((f) => [`${f.home_team} - ${f.away_team}`, (f.candidates || []).map((c) => `${c.player_name}×${c.count}`).join(", ")]),
+      });
+    }
+    try {
+      await apiDownload("/export/pdf", { title: `ScoreAndLive · ${t.name}`, subtitle: `Giornata ${md?.matchday_number ?? ""}`, filename: `scoreandlive_${(t.name || "torneo").replace(/\s+/g, "_")}`, sections }, "scoreandlive.pdf");
+    } catch (e) { toast.error(e.message); }
+  };
   return (
     <div className="space-y-5">
       <button data-testid="sald-back" onClick={() => navigate("/scoreandlive")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Tornei</button>
@@ -154,6 +171,7 @@ export default function ScoreAndLiveDetail() {
       <div>
         <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><BarChart3 size={18} className="text-[#3B82F6]" /> Riepilogo giornata</h2>
         <button data-testid="sald-summary-btn" onClick={loadSummary} className="w-full text-sm font-bold text-[#3B82F6] border border-[#3B82F6]/30 rounded-md py-2 mb-2">Mostra riepilogo giornata corrente</button>
+        <button data-testid="sald-export-pdf" onClick={exportPdf} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#00D95F] border border-[#00D95F]/30 rounded-md py-2 mb-2"><FileDown size={16} /> Esporta PDF</button>
         {summary && (
           <div className="mt-3 space-y-2">
             {(summary.fixtures || []).map((f, i) => (

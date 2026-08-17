@@ -21,6 +21,7 @@ re-exported from :mod:`thebesttiket` at the bottom of this module.
 """
 import os
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -199,6 +200,11 @@ _push_router = _build_push_router(
 )
 api.include_router(_push_router)
 
+# PDF export (admin)
+from exports import build_router as _build_export_router  # noqa: E402
+from web_push import broadcast_push as _broadcast_push  # noqa: E402
+api.include_router(_build_export_router(current_admin=require_admin))
+
 
 # =========================================================================
 # Startup / shutdown
@@ -256,11 +262,56 @@ async def startup():
         logger.exception("deadlines backfill failed")
 
     await seed_admin_if_missing(db)
+
+    # Automatic notifications: background loop that notifies participants when a
+    # new matchday opens and reminds them when the deadline is near.
+    import asyncio
+
+    async def _auto_notify_loop():
+        while True:
+            try:
+                now = datetime.now(timezone.utc)
+                async for d in db.matchday_deadlines.find({}):
+                    md = d.get("matchday")
+                    raw = d.get("deadline_at")
+                    dt = None
+                    if raw:
+                        try:
+                            dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                        except Exception:
+                            dt = None
+                    # Seed / open notification (only broadcast for FUTURE deadlines)
+                    if not d.get("open_notified"):
+                        if dt and dt > now:
+                            await _broadcast_push(db, payload={
+                                "title": "Nuova giornata aperta",
+                                "body": f"Giornata {md}: fai i tuoi pronostici prima della scadenza!",
+                                "url": "/hub",
+                            })
+                        await db.matchday_deadlines.update_one({"_id": d["_id"]}, {"$set": {"open_notified": True}})
+                    # Reminder when < 60 min to deadline
+                    if dt and now < dt and (dt - now).total_seconds() <= 3600 and not d.get("reminder_sent"):
+                        await _broadcast_push(db, payload={
+                            "title": "Ultimi minuti!",
+                            "body": f"Stanno per chiudersi i pronostici della giornata {md}.",
+                            "url": "/hub",
+                        })
+                        await db.matchday_deadlines.update_one({"_id": d["_id"]}, {"$set": {"reminder_sent": True}})
+            except Exception:
+                logger.exception("auto-notify loop iteration failed")
+            await asyncio.sleep(300)
+
+    app.state.auto_notify_task = asyncio.create_task(_auto_notify_loop())
     logger.info("RinoMagic API started")
 
 
 @app.on_event("shutdown")
 async def shutdown():
+    task = getattr(app.state, "auto_notify_task", None)
+    if task:
+        task.cancel()
     client.close()
 
 

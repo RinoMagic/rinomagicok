@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 6 backend + frontend testing of 3 new features: (1) Import Voti Guidato (dry_run preview), (2) Esporta Storico PDF, (3) Notifiche Automatiche (background loop + deadline endpoints). Backend: 18/18 pytest PASSED in ~14s (test_iter6_features.py) — includes admin & player login, /api/export/pdf 200 application/pdf (admin), 403 (player), 401/403 (unauth), garbage-PDF dry_run returns 400 with Italian detail message, dry_run=false&replace=true params accepted (no 422), non-admin voti upload → 403, deadlines list returns 38 slots, PUT/GET future deadline round-trip works, backend stays healthy after ops (auto-notify loop did not crash startup). Frontend: admin login OK, /admin panel shows new 'Import Voti (PDF / Excel) — con anteprima' section with data-testid admin-pdf + admin-xlsx; uploading a garbage PDF correctly shows NO preview rows (voti-row-0 and voti-confirm both absent, backend returns 400 as expected). SurvivalDetail /survival/{id} renders without runtime errors; svd-export-pdf click triggers POST /api/export/pdf → 200 application/pdf. ScoreAndLiveDetail sald-export-pdf click also → 200 application/pdf. FantaGiornata league page redirects to /hub for admin (admin not a member of any league) — could not exercise fgl-export-pdf via UI, but code path is identical to the two working buttons (same apiDownload helper + same backend endpoint verified by tests). Hub shows 4+1 game cards. No critical bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "FantaGiornata Punteggi export (fgl-export-pdf)", "issue": "Could not exercise via UI because the QA admin account is not a member of any FG league (opening /fantagiornata/{id} silently redirects to /). Non-blocking — backend /api/export/pdf verified 200 application/pdf and same apiDownload helper works for SV+SAL variants.", "affected_selectors": ["[data-testid='fgl-export-pdf']"]}
+    ],
+    "design_issues": [
+      {"screen": "/admin panel — Scadenze giornata", "issues": ["Deadline picker uses the browser's native datetime-local input (mm/dd/yyyy, --:--) instead of a shadcn/ui Calendar/DatePicker — inconsistent look with the rest of the dark-themed UI."]},
+      {"screen": "ScoreAndLiveDetail", "issues": ["Pre-existing (iter4) React hydration warning still present: '<span> cannot be a child of <option>' at ScoreAndLiveDetail.js:107. Cosmetic."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter6_features.py",
+    "/app/test_reports/pytest/iter6_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Replace the browser-native datetime-local picker in Admin.js 'Scadenze giornata' with a shadcn Calendar/DatePicker for visual consistency.",
+    "(Optional cleanup) Long-standing cosmetic <span>-in-<option> warning at ScoreAndLiveDetail.js:107."
+  ],
+  "critical_code_review_comments": [
+    "Auto-notify loop in server.py (_auto_notify_loop) correctly guards against crashing startup: wrapped in try/except with 5-min sleep. Silently marks past deadlines as open_notified — matches the stated design.",
+    "exports.py /export/pdf uses local imports for reportlab (fine), StreamingResponse with Content-Disposition — good.",
+    "matchday_facts.py dry_run branch now includes 'rows' key when parsing succeeds — verified by code inspection (line 352). Cannot execute happy-path without a real Voti PDF fixture; 400-path exercised.",
+    "apiDownload helper in /app/frontend/src/lib/api.js correctly creates a blob URL and triggers download via anchor click; error path throws with extracted message.",
+    "Admin.js voti preview flow: previewVoti sends dry_run=true and shows rows only when rows.length > 0 — verified: garbage PDF → 400 → no preview shown (correct)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter6_features.py (NEW — 18 tests across 5 classes)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "~95% (5 of 5 checked flows OK; FG PDF button not UI-exercised due to admin membership)"},
+  "test_credentials": "QA admin e1qa.admin@gmail.com / Test1234! (login response uses 'token' key, not 'access_token'); QA player e1_qa_player / Test1234!.",
+  "seed_data_creation": "None. Set /api/deadlines/38 to now+30min then restored previous value. Uploaded a garbage 15-byte fake PDF as multipart form — rejected as expected.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test files now: test_rinomagic_flows.py, test_new_features.py, test_iter4_features.py, test_iter5_features.py, test_iter6_features.py. Run with `export REACT_APP_BACKEND_URL=https://game-schedina.preview.emergentagent.com && pytest backend/tests/ -v`. Frontend token key in localStorage is `schedinabar_token` (NOT `token`/`access_token`). Login response returns `{token, user}`. /api/export/pdf accepts {title, subtitle, filename, sections:[{heading,columns,rows}]}, returns application/pdf with Content-Disposition. /api/admin/voti/upload-pdf accepts query params dry_run (default true) and replace (default true). Auto-notify loop runs every 5 min; verified endpoints reachable and no startup crash.",
+  "rca of the issue": "N/A — no bugs to root-cause this iteration."
+}

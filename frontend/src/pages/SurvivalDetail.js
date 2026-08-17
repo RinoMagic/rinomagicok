@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3 } from "lucide-react";
-import { api } from "@/lib/api";
+import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3, FileDown } from "lucide-react";
+import { api, apiDownload } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
 import NotifyBox from "@/components/NotifyBox";
@@ -98,6 +98,24 @@ export default function SurvivalDetail() {
     setSummaryMd(id);
     try { setSummary(await api(`/sv/tournaments/${tid}/matchdays/${id}/summary`)); }
     catch (e) { toast.error(e.message); }
+  };
+
+  const exportPdf = async () => {
+    const sections = [{
+      heading: "Classifica",
+      columns: ["#", "Giocatore", "Vite", "Stato"],
+      rows: participants.map((p, i) => [i + 1, p.nickname, p.lives_left, p.eliminated_at != null ? `Fuori G${p.eliminated_at}` : "In gioco"]),
+    }];
+    if (summary?.fixtures) {
+      sections.push({
+        heading: `Riepilogo giornata`,
+        columns: ["Partita", "1", "X", "2"],
+        rows: summary.fixtures.map((f) => [`${f.home_team} - ${f.away_team}`, f.counts?.["1"] ?? 0, f.counts?.["X"] ?? 0, f.counts?.["2"] ?? 0]),
+      });
+    }
+    try {
+      await apiDownload("/export/pdf", { title: `Survival · ${t.name}`, subtitle: `Giornata ${md?.matchday ?? t.current_matchday}`, filename: `survival_${(t.name || "torneo").replace(/\s+/g, "_")}`, sections }, "survival.pdf");
+    } catch (e) { toast.error(e.message); }
   };
 
   if (loading || !t) return <div className="py-16 text-center text-[#94A3B8]">Caricamento...</div>;
@@ -197,6 +215,9 @@ export default function SurvivalDetail() {
         </div>
         <button data-testid="svd-summary-btn" onClick={() => loadSummary()} className="w-full text-sm font-bold text-[#F59E0B] border border-[#F59E0B]/30 rounded-md py-2">
           Mostra riepilogo {md ? `giornata ${md.matchday ?? t.current_matchday}` : ""}
+        </button>
+        <button data-testid="svd-export-pdf" onClick={exportPdf} className="mt-2 w-full flex items-center justify-center gap-2 text-sm font-bold text-[#00D95F] border border-[#00D95F]/30 rounded-md py-2">
+          <FileDown size={16} /> Esporta PDF (riepilogo + classifica)
         </button>
         {summary && (
           <div className="mt-3 space-y-2">

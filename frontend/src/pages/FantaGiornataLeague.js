@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Trophy, Search, X, Send, Shirt, ListChecks } from "lucide-react";
-import { api } from "@/lib/api";
+import { ChevronLeft, Trophy, Search, X, Send, Shirt, ListChecks, FileDown } from "lucide-react";
+import { api, apiDownload } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
 import NotifyBox from "@/components/NotifyBox";
@@ -69,6 +69,16 @@ export default function FantaGiornataLeague() {
   const settleMd = async () => {
     try { await api(`/fg/leagues/${leagueId}/settle`, { method: "POST", body: { matchday: md } }); toast.success("Punti calcolati!"); api(`/fg/leagues/${leagueId}/results/${md}`).then(setFgResults); }
     catch (e) { toast.error(e.message); }
+  };
+
+  const exportPdf = async () => {
+    const sections = [
+      { heading: `Punti giornata ${md}`, columns: ["#", "Giocatore", "Fantavoto"], rows: (fgResults?.results || []).map((r, i) => [i + 1, r.nickname, Number(r.total_fantavoto ?? r.total ?? 0).toFixed(1)]) },
+      { heading: "Classifica generale", columns: ["#", "Giocatore", "Giornate", "Totale"], rows: board.map((r, i) => [i + 1, r.nickname, r.matchdays_played, r.total]) },
+    ];
+    try {
+      await apiDownload("/export/pdf", { title: `FantaGiornata · ${lg.name}`, subtitle: `Giornata ${md}`, filename: `fantagiornata_${(lg.name || "lega").replace(/\s+/g, "_")}`, sections }, "fantagiornata.pdf");
+    } catch (e) { toast.error(e.message); }
   };
 
   useEffect(() => {
@@ -224,6 +234,7 @@ export default function FantaGiornataLeague() {
           {(isAdmin || lg.is_admin) && (
             <button data-testid="fgl-settle" onClick={settleMd} className="w-full bg-[#EF4444] text-white font-bold rounded-md py-2.5 text-sm">Calcola punti giornata {md} (dai voti caricati)</button>
           )}
+          <button data-testid="fgl-export-pdf" onClick={exportPdf} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#00D95F] border border-[#00D95F]/30 rounded-md py-2"><FileDown size={16} /> Esporta PDF (punteggi + classifica)</button>
           <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
             <div className="px-5 py-3 text-xs uppercase tracking-widest text-[#94A3B8]">Punti giornata {md}</div>
             {(!fgResults || (fgResults.results || []).length === 0) ? (
