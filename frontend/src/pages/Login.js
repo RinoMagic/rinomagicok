@@ -64,7 +64,7 @@ export default function Login() {
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder={placeholder}
               autoCapitalize="none"
-              className="w-full bg-white/8 border border-white/18 rounded-md px-4 py-3 text-white placeholder-white/50 outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
+              className="w-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-md px-4 py-3 text-white placeholder-[rgba(255,255,255,0.5)] outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
             />
             {mode !== "forgot" && (
               <input
@@ -73,7 +73,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full bg-white/8 border border-white/18 rounded-md px-4 py-3 text-white placeholder-white/50 outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
+                className="w-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-md px-4 py-3 text-white placeholder-[rgba(255,255,255,0.5)] outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
               />
             )}
             {err && <p className="text-[#ff6b6b] text-sm text-center">{err}</p>}
