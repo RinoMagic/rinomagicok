@@ -21,12 +21,13 @@ re-exported from :mod:`thebesttiket` at the bottom of this module.
 """
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -205,6 +206,32 @@ from exports import build_router as _build_export_router  # noqa: E402
 from web_push import broadcast_push as _broadcast_push  # noqa: E402
 api.include_router(_build_export_router(current_admin=require_admin))
 
+DEFAULT_REMINDER_OFFSETS = [1440, 180, 60]  # minutes before deadline (24h, 3h, 1h)
+
+
+class RemindersIn(BaseModel):
+    offsets_minutes: List[int] = Field(default_factory=list)
+
+
+async def _get_reminder_offsets() -> List[int]:
+    s = await db.app_settings.find_one({"_id": "reminders"})
+    offs = (s or {}).get("offsets_minutes")
+    return offs if offs else DEFAULT_REMINDER_OFFSETS
+
+
+@api.get("/settings/reminders")
+async def get_reminders(user: dict = Depends(require_admin)):
+    return {"offsets_minutes": await _get_reminder_offsets()}
+
+
+@api.put("/settings/reminders")
+async def set_reminders(body: RemindersIn, user: dict = Depends(require_admin)):
+    offs = sorted({int(x) for x in body.offsets_minutes if 5 <= int(x) <= 10080}, reverse=True)
+    await db.app_settings.update_one(
+        {"_id": "reminders"}, {"$set": {"offsets_minutes": offs}}, upsert=True
+    )
+    return {"offsets_minutes": offs}
+
 
 # =========================================================================
 # Startup / shutdown
@@ -271,6 +298,7 @@ async def startup():
         while True:
             try:
                 now = datetime.now(timezone.utc)
+                offsets = await _get_reminder_offsets()
                 async for d in db.matchday_deadlines.find({}):
                     md = d.get("matchday")
                     raw = d.get("deadline_at")
@@ -291,14 +319,28 @@ async def startup():
                                 "url": "/hub",
                             })
                         await db.matchday_deadlines.update_one({"_id": d["_id"]}, {"$set": {"open_notified": True}})
-                    # Reminder when < 60 min to deadline
-                    if dt and now < dt and (dt - now).total_seconds() <= 3600 and not d.get("reminder_sent"):
-                        await _broadcast_push(db, payload={
-                            "title": "Ultimi minuti!",
-                            "body": f"Stanno per chiudersi i pronostici della giornata {md}.",
-                            "url": "/hub",
-                        })
-                        await db.matchday_deadlines.update_one({"_id": d["_id"]}, {"$set": {"reminder_sent": True}})
+                    # Configurable reminders: one push per admin-chosen offset
+                    if dt and now < dt:
+                        reminded = set(d.get("reminded_offsets", []))
+                        newly = False
+                        for off in offsets:
+                            threshold = dt - timedelta(minutes=off)
+                            if now >= threshold and off not in reminded:
+                                if off % 1440 == 0:
+                                    lbl = f"{off // 1440} giorn{'o' if off // 1440 == 1 else 'i'}"
+                                elif off % 60 == 0:
+                                    lbl = f"{off // 60} or{'a' if off // 60 == 1 else 'e'}"
+                                else:
+                                    lbl = f"{off} minuti"
+                                await _broadcast_push(db, payload={
+                                    "title": "Promemoria pronostici",
+                                    "body": f"Mancano circa {lbl} alla scadenza della giornata {md}!",
+                                    "url": "/hub",
+                                })
+                                reminded.add(off)
+                                newly = True
+                        if newly:
+                            await db.matchday_deadlines.update_one({"_id": d["_id"]}, {"$set": {"reminded_offsets": list(reminded)}})
             except Exception:
                 logger.exception("auto-notify loop iteration failed")
             await asyncio.sleep(300)

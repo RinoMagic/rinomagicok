@@ -22,6 +22,14 @@ export default function Admin() {
   const loadUsers = () => api("/auth/users").then(setUsers).catch((e) => toast.error(e.message));
   useEffect(() => { loadUsers(); }, []);
 
+  const [reminderOffsets, setReminderOffsets] = useState([]);
+  useEffect(() => { api("/settings/reminders").then((r) => setReminderOffsets(r.offsets_minutes || [])).catch(() => {}); }, []);
+  const toggleOffset = (m) => setReminderOffsets((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m]);
+  const saveReminders = async () => {
+    try { const r = await api("/settings/reminders", { method: "PUT", body: { offsets_minutes: reminderOffsets } }); setReminderOffsets(r.offsets_minutes || []); toast.success("Promemoria salvati"); }
+    catch (e) { toast.error(e.message); }
+  };
+
   const toggleBlock = async (u) => {
     try {
       await api(`/auth/users/${u.id}/${u.blocked ? "unblock" : "block"}`, { method: "POST" });
@@ -123,6 +131,19 @@ export default function Admin() {
         <input data-testid="admin-bc-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo" className="w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm" />
         <input data-testid="admin-bc-body" value={bodyMsg} onChange={(e) => setBodyMsg(e.target.value)} placeholder="Messaggio" className="w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm" />
         <button data-testid="admin-bc-send" onClick={broadcast} disabled={!title || !bodyMsg} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2 disabled:opacity-50">Invia a tutti</button>
+      </Card>
+
+      <Card icon={Bell} title="Promemoria automatici prima della scadenza">
+        <p className="text-xs text-[#94A3B8]">Scegli quando avvisare automaticamente i partecipanti prima della chiusura dei pronostici.</p>
+        <div className="flex flex-wrap gap-2">
+          {[[1440, "24 ore"], [720, "12 ore"], [360, "6 ore"], [180, "3 ore"], [60, "1 ora"], [30, "30 min"]].map(([m, l]) => {
+            const on = reminderOffsets.includes(m);
+            return (
+              <button key={m} data-testid={`reminder-${m}`} onClick={() => toggleOffset(m)} className={`px-3 py-1.5 rounded-md text-sm font-bold border transition-colors ${on ? "bg-[#F59E0B] text-[#1A1000] border-[#F59E0B]" : "bg-[#0F1216] text-[#94A3B8] border-white/15"}`}>{l}</button>
+            );
+          })}
+        </div>
+        <button data-testid="reminder-save" onClick={saveReminders} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2 w-fit">Salva promemoria</button>
       </Card>
 
       <Card icon={FileText} title="Import Voti (PDF / Excel) — con anteprima">

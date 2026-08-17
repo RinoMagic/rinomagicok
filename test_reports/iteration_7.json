@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 7 (Notifiche Personalizzate) fully validated. Backend: 10/10 pytest tests pass for GET/PUT /api/settings/reminders — admin-only access enforced (401 unauth, 403 player), validation drops values <5 and >10080, dedupes and sorts descending, persistence verified via GET after PUT, and the documented empty-list edge case (falls back to DEFAULT_REMINDER_OFFSETS on GET) is confirmed. Backend healthy, auto-notify loop running with no crash in logs. Frontend: Admin /admin renders 'Promemoria automatici prima della scadenza' card with all 6 chips (reminder-1440, -720, -360, -180, -60, -30) plus reminder-save button. Default pre-selection (24h/3h/1h) highlighted on load. Toggling chips + Salva promemoria shows 'Promemoria salvati' success toast, and reloaded state exactly matches the saved offsets [1440,720,60,30]. Regression smoke ok: Scadenze giornata, Notifica broadcast, Import Voti, Gestione utenti, Promemoria card all render; admin login works. Reminder offsets restored to default [1440,180,60] at end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_reminders.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: In _get_reminder_offsets, saving an empty list via PUT silently falls back to DEFAULT_REMINDER_OFFSETS on subsequent GET. This means admin cannot fully disable reminders; consider distinguishing 'not configured' from 'explicitly empty' (e.g., check if the settings doc exists rather than truthiness of offsets_minutes).",
+    "Non-blocking: 'IndexKeySpecsConflict' warnings on users email/username indexes at startup — harmless but noisy, indexes already exist with different partial-filter spec; consider aligning create_index parameters to existing DB indexes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_reminders.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin e1qa.admin@gmail.com / Test1234! ; Player e1_qa_player / Test1234!",
+  "seed_data_creation": "None. Reminder offsets restored to [1440,180,60] after tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 7 endpoints: GET/PUT /api/settings/reminders (admin). Empty-list PUT is stored but GET returns default fallback — documented behaviour. Test file test_iter7_reminders.py restores defaults [1440,180,60] at the end.",
+  "rca of the issue": "N/A — no bugs found."
+}

@@ -50,6 +50,10 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 ## Status
 - Tutti i 4 giochi (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus attivi sul web.
 
+## Implemented — iteration 6 (2026-06)
+- Notifiche Personalizzate: l'admin sceglie gli intervalli di promemoria (24h/12h/6h/3h/1h/30min) via GET/PUT `/api/settings/reminders` (validati 5–10080 min, dedupe, sort desc, salvati in `app_settings`); la loop auto-notify invia un promemoria per ogni offset e traccia `reminded_offsets` per giornata. UI: card "Promemoria automatici" nel Pannello Admin con chip toggle + salva.
+- Verified: testing agent iteration_7 — backend 100%, frontend 100%, nessun bug.
+
 ## Implemented — iteration 5 (2026-06)
 - Import Voti Guidato: upload PDF/Excel in `dry_run` → anteprima tabellare giocatore→voto (rows aggiunte alla risposta dry_run) → "Conferma e salva" (`dry_run=false&replace=true`).
 - Notifiche Automatiche: task asyncio di startup che scandisce `matchday_deadlines` → broadcast "Nuova giornata aperta" per scadenze future non ancora notificate e promemoria "Ultimi minuti" entro 60' (le scadenze passate vengono solo marcate, niente spam).
