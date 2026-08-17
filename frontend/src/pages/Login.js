@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
@@ -7,6 +8,7 @@ export default function Login() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState(null);
   const [ok, setOk] = useState(null);
 
@@ -67,14 +69,25 @@ export default function Login() {
               className="w-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-md px-4 py-3 text-white placeholder-[rgba(255,255,255,0.5)] outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
             />
             {mode !== "forgot" && (
-              <input
-                data-testid="auth-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-md px-4 py-3 text-white placeholder-[rgba(255,255,255,0.5)] outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
-              />
+              <div className="relative">
+                <input
+                  data-testid="auth-password"
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-md px-4 py-3 pr-12 text-white placeholder-[rgba(255,255,255,0.5)] outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
+                />
+                <button
+                  type="button"
+                  data-testid="toggle-password-visibility"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? "Nascondi password" : "Mostra password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                >
+                  {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             )}
             {err && <p className="text-[#ff6b6b] text-sm text-center">{err}</p>}
             {ok && <p className="text-[#4ade80] text-sm text-center">{ok}</p>}
