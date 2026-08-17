@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy } from "lucide-react";
+import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import InvitesManager from "@/components/InvitesManager";
 
 const SIGNS = ["1", "X", "2"];
 
@@ -17,6 +18,7 @@ export default function SurvivalDetail() {
   const [locked, setLocked] = useState({ locked_teams: [], lives_left: 0 });
   const [myPicks, setMyPicks] = useState({ picks: [], required: 0 });
   const [sel, setSel] = useState({}); // fixture_key -> sign
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -80,6 +82,12 @@ export default function SurvivalDetail() {
   const join = async () => {
     if (!t?.invite_code) return;
     try { await api("/sv/tournaments/join", { method: "POST", body: { invite_code: t.invite_code } }); toast.success("Iscritto!"); load(); }
+    catch (e) { toast.error(e.message); }
+  };
+
+  const loadSummary = async () => {
+    if (!md) { toast.info("Nessuna giornata attiva"); return; }
+    try { setSummary(await api(`/sv/tournaments/${tid}/matchdays/${md.id}/summary`)); }
     catch (e) { toast.error(e.message); }
   };
 
@@ -163,6 +171,36 @@ export default function SurvivalDetail() {
           )}
         </div>
       )}
+
+      {(isAdmin || t.is_admin) && <InvitesManager basePath={`/sv/tournaments/${tid}`} />}
+
+      <div className="rounded-xl border border-white/10 bg-[#181D22] p-4">
+        <button data-testid="svd-summary-btn" onClick={loadSummary} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#F59E0B]">
+          <BarChart3 size={16} /> Riepilogo giornata {md?.matchday ?? t.current_matchday}
+        </button>
+        {summary && (
+          <div className="mt-3 space-y-2">
+            {summary.counts_hidden && <div className="text-xs text-[#94A3B8]">Conteggi nascosti per privacy (pochi superstiti) fino al calcio d'inizio.</div>}
+            {(summary.fixtures || []).map((f, i) => (
+              <div key={i} className="rounded-lg bg-[#0F1216] p-3">
+                <div className="text-sm font-medium">{f.home_team} - {f.away_team}</div>
+                <div className="flex gap-3 mt-1 text-xs text-[#94A3B8]">
+                  <span>1: <b className="text-white">{f.counts?.["1"] ?? 0}</b></span>
+                  <span>X: <b className="text-white">{f.counts?.["X"] ?? 0}</b></span>
+                  <span>2: <b className="text-white">{f.counts?.["2"] ?? 0}</b></span>
+                </div>
+                {Array.isArray(f.picks) && f.picks.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {f.picks.map((p, j) => (
+                      <span key={j} className={`text-xs px-2 py-0.5 rounded ${p.correct === true ? "bg-[#00D95F]/20 text-[#00D95F]" : p.correct === false ? "bg-[#EF4444]/20 text-[#EF4444]" : "bg-white/10"}`}>{p.nickname}: {p.pick}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div>
         <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>

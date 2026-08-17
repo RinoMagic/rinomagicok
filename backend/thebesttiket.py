@@ -82,7 +82,7 @@ GAMES: Dict[str, Dict[str, Any]] = {
         "tagline": "Fantacalcio a giornata singola",
         "color": "#A855F7",
         "icon": "football",
-        "enabled": False,
+        "enabled": True,
     },
     "surviva": {
         "id": "surviva",

@@ -38,3 +38,14 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 ## Notes update
 - FantaGiornata resta PROSSIMAMENTE (backend router presente, UI non ancora costruita).
 - Regression suites: test_rinomagic_flows.py (25) + test_new_features.py (24).
+
+## Implemented — iteration 3 (2026-06)
+- FantaGiornata ATTIVO (GAMES enabled=true): crea lega, iscrizione con codice, **builder formazione** (modulo 3-4-3…5-4-1, 11 titolari 1P + modulo + 8 panchina 2P/2D/2C/2A, listone reale via /sal/players), classifica e vista Formazioni.
+- Gestione Inviti (componente riutilizzabile InvitesManager) per admin su Tiket room, Survival, ScoreAndLive e FantaGiornata: genera/copia/revoca codici (GET/POST/DELETE `${base}/invites`).
+- Riepilogo Giornata: Survival (`/sv/.../matchdays/{id}/summary`) e ScoreAndLive (`/sal/.../matchdays/{id}/summary`) — conteggi 1/X/2 e pronostici/candidati di tutti i giocatori.
+- Gestione Utenti nel Pannello Admin: lista utenti, blocca/sblocca (`/auth/users/{id}/block|unblock`), reset password (`/auth/users/reset-password`).
+- Tutti e 4 i giochi ora ATTIVI nell'hub (nessun "prossimamente").
+- Verified: testing agent iteration_4 — backend 26/26, tutti i flussi UI, nessun bug funzionale.
+
+## Status
+- Tutti i 4 giochi (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus attivi sul web. Backlog residuo: pannelli admin avanzati (settle-matchday UI più ricca, storici), rifiniture.

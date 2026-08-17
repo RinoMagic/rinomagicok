@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ChevronLeft, Trophy, Users, Copy, Upload, CheckCircle2, Camera } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import InvitesManager from "@/components/InvitesManager";
 
 export default function TiketRoom() {
   const { roomId } = useParams();
@@ -81,10 +82,11 @@ export default function TiketRoom() {
         )}
       </div>
 
+      {(isAdmin || room.is_admin) && <InvitesManager basePath={`/rooms/${roomId}`} />}
+
       {/* Schedina upload (OCR) */}
       <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/5 p-4 space-y-3">
-        <div className="font-bold flex items-center gap-2"><Camera size={18} className="text-[#F59E0B]" /> La tua schedina</div>
-        {mySchedina?.events?.length > 0 && !draft && (
+        <div className="font-bold flex items-center gap-2"><Camera size={18} className="text-[#F59E0B]" /> La tua schedina</div>        {mySchedina?.events?.length > 0 && !draft && (
           <div className="rounded-lg bg-[#0F1216] border border-white/10 divide-y divide-white/10">
             <div className="px-3 py-2 text-xs text-[#94A3B8] flex items-center gap-1"><CheckCircle2 size={13} className="text-[#00D95F]" /> Confermata · {mySchedina.events.length} eventi</div>
             {mySchedina.events.map((ev, i) => (

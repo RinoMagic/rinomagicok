@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 4 E2E: 26/26 backend pytest PASSED (~74s) + full frontend UI smoke on production URL. Coverage: (1) /api/games regression — ALL 4 games (thebesttiket, surviva, scoreandlive, fantagiornata) now enabled=True. (2) FantaGiornata full E2E: admin POST /fg/leagues creates league with invite_code + auto-enrolls all admins; GET list; GET detail returns members + current_matchday_number (integer); invites GET/POST/DELETE lifecycle (initial invite from creation + new create + revoke); by-code preview + player join; sal/players search by role P/D/C/A with counts sufficient for 3-4-3; save_lineup with valid 3-4-3 (1P+3D+4C+3A starters + 2P/2D/2C/2A bench, no overlap) returns 200 with matchday=current_matchday_number; GET lineup returns 11+8; leaderboard returns dict {league_id, leaderboard:[members]}; all-lineups view /lineups/{md} 200. (3) Gestione Inviti verified for tiket rooms + survival + scoreandlive: GET list, POST create returns code, DELETE marks revoked, player POST → 403. (4) Riepilogo Giornata: survival matchday summary returns fixtures with counts {1,X,2} per fixture; scoreandlive matchday summary returns fixtures list. (5) Gestione Utenti: created throwaway e1_tmp_<ts> player, GET /auth/users omits password_hash, player GET → 403, block/unblock toggles blocked flag (verified via GET + login attempt while blocked → 401), reset-password with new_password works (login succeeds with new pw), player block+reset → 401/403, cleanup DELETE succeeds. NO 9 real users were modified. FRONTEND: admin login (email path unified with nickname login), Hub shows all 4 game-card testids. /fanta → creates league + navigates to /fanta/{id}; league page has inv-create, fgl-module, fgl-role-P/D/C/A, fgl-search, fgl-submit (disabled until 11+8) — inviti Genera creates a code with copy+revoke buttons wired via inv-copy-{id} + inv-revoke-{id}. Settings → 'Pannello Admin' → /admin renders admin-user-* rows (12) + admin-user-block-{id} + admin-user-reset-{id}. Survival detail (/survival/{id}) shows 'Gestione inviti' section + 'Riepilogo giornata' button. ScoreAndLive detail (/scoreandlive/{id}) shows 'Gestione inviti' + 'Riepilogo giornata' list (Atalanta-Sassuolo etc.). Tiket room shows 'Gestione inviti' with active + revoked invites rendered.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ScoreAndLiveDetail (/scoreandlive/{id})", "issues": ["Hydration warning: <span> cannot be a child of <option> (ScoreAndLiveDetail.js:100 — the marcatore <select> renders <option><span>{full_name}</span></option> due to a wrapping expression). Cosmetic React warning only; does not break functionality but should be cleaned by rendering plain text inside <option>."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter4_features.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [
+    "(Cosmetic) In /app/frontend/src/pages/ScoreAndLiveDetail.js:100, ensure the <option> renders raw text (e.g., {pl.full_name}) without a wrapping <span>, to silence the React hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "fantagiornata.py get_league (line 390): current_matchday_number derivation defaults to 1 when no deadlines exist AND no lineups yet — fine, but if the admin later sets a deadline for a past matchday, the endpoint will report that past matchday as 'current' (past_dl branch). Should probably prefer the earliest FUTURE deadline unconditionally, and only fall through to past if the past was VERY recent (settle window).",
+    "fantagiornata.py save_lineup applies the GLOBAL cross-game deadline (matchday_deadlines) via _global_deadline_passed — this couples FG to whatever deadline the admin set for the same matchday in another game. If a QA admin PUTs /deadlines/38 to a past timestamp for survival, FG lineup for md=38 will suddenly 403. Consider a per-game deadline or documenting this coupling.",
+    "auth.py reset-password endpoint has no minimum-length policy on new_password (client sends 'x' → 200). Recommend Pydantic min_length=8 on ResetPlayerPasswordIn.new_password to mirror registration policy.",
+    "fantagiornata.py leaderboard returns a DICT shape {league_id, leaderboard:[...]} while list_leagues + participants return raw arrays. Inconsistent — front-end may need to normalize. Documented in the test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter4_features.py (new — 26 tests, 5 classes for iteration 4 features)"
+  ],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "100% of tested flows"},
+  "test_credentials": "QA admin e1qa.admin@gmail.com / Test1234! (email or nickname), QA player e1_qa_player / Test1234! — from /app/memory/test_credentials.md. Throwaway player e1_tmp_<ts> created and cleaned up per pytest module.",
+  "seed_data_creation": "Per module run: 1 fg league (TEST_FG_<ts>) + 1 tiket room (TEST_INV_ROOM_<ts>) + 2 survival tournaments (TEST_INV_SV, TEST_SUM_SV) + 2 sal tournaments (TEST_INV_SAL, TEST_SUM_SAL) + 1 throwaway player (e1_tmp_<ts>, deleted at end). Frontend also created a UI_FG_<ts> league. No real user modified; no sal_calendar/sal_players touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Three backend test files now: test_rinomagic_flows.py (25), test_new_features.py (24), test_iter4_features.py (26). Run all: pytest /app/backend/tests -n 2 --junitxml=/app/test_reports/pytest/all.xml (~2 min). FG leaderboard shape is {league_id, leaderboard:[]} not a bare list. FG save_lineup enforces GLOBAL deadline via matchday_deadlines; if it 403s use current_matchday_number from GET /fg/leagues/{id}. FG /leagues/{id}/lineups/{md} returns members+own-lineup — not asserted-strict, verified as non-null.",
+  "rca of the issue": "No functional bugs found in iteration-4 features. Only cosmetic issues: (a) ScoreAndLiveDetail <select> wraps <option> content in <span> triggering React hydration warning — inspect line 100 and switch to plain text child; (b) auth reset-password has no min_length constraint — an admin can set a 1-char password on any player."
+}

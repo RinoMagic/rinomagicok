@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Heart, Skull, Send, Copy, Trophy } from "lucide-react";
+import { ChevronLeft, Heart, Skull, Send, Copy, Trophy, BarChart3 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import InvitesManager from "@/components/InvitesManager";
 
 export default function ScoreAndLiveDetail() {
   const { tid } = useParams();
@@ -13,6 +14,7 @@ export default function ScoreAndLiveDetail() {
   const [md, setMd] = useState(null);
   const [playersByTeam, setPlayersByTeam] = useState({});
   const [sel, setSel] = useState({}); // fixture_idx -> player_id
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -55,9 +57,14 @@ export default function ScoreAndLiveDetail() {
     } catch (e) { toast.error(e.message); }
   };
 
+  const loadSummary = async () => {
+    if (!md) { toast.info("Nessuna giornata attiva"); return; }
+    try { setSummary(await api(`/sal/tournaments/${tid}/matchdays/${md.id}/summary`)); }
+    catch (e) { toast.error(e.message); }
+  };
+
   if (loading || !t) return <div className="py-16 text-center text-[#94A3B8]">Caricamento...</div>;
   const parts = t.participants || [];
-
   return (
     <div className="space-y-5">
       <button data-testid="sald-back" onClick={() => navigate("/scoreandlive")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Tornei</button>
@@ -102,9 +109,40 @@ export default function ScoreAndLiveDetail() {
         </div>
       )}
 
+      {(isAdmin || t.is_admin) && <InvitesManager basePath={`/sal/tournaments/${tid}`} />}
+
+      <div className="rounded-xl border border-white/10 bg-[#181D22] p-4">
+        <button data-testid="sald-summary-btn" onClick={loadSummary} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#3B82F6]">
+          <BarChart3 size={16} /> Riepilogo giornata {md?.matchday_number ?? ""}
+        </button>
+        {summary && (
+          <div className="mt-3 space-y-2">
+            {(summary.fixtures || []).map((f, i) => (
+              <div key={i} className="rounded-lg bg-[#0F1216] p-3">
+                <div className="text-sm font-medium">{f.home_team} - {f.away_team}</div>
+                {(f.candidates || []).length === 0 ? (
+                  <div className="text-xs text-[#64748B] mt-1">Nessun marcatore scelto (o nascosto per privacy).</div>
+                ) : (
+                  <div className="mt-1 space-y-1">
+                    {f.candidates.map((c, j) => (
+                      <div key={j} className="text-xs flex items-center gap-2">
+                        <span className="text-white">{c.player_name}</span>
+                        <span className="text-[#94A3B8]">×{c.count}</span>
+                        {Array.isArray(c.pickers) && c.pickers.length > 0 && (
+                          <span className="text-[#64748B]">— {c.pickers.map((p) => p.nickname).join(", ")}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div>
-        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>
-        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
           {parts.map((p, i) => {
             const out = p.eliminated_at_matchday != null;
             return (

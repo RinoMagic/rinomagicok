@@ -12,6 +12,8 @@ import TiketRoom from "@/pages/TiketRoom";
 import ScoreAndLive from "@/pages/ScoreAndLive";
 import ScoreAndLiveDetail from "@/pages/ScoreAndLiveDetail";
 import Bonus from "@/pages/Bonus";
+import FantaGiornata from "@/pages/FantaGiornata";
+import FantaGiornataLeague from "@/pages/FantaGiornataLeague";
 import Admin from "@/pages/Admin";
 import Settings from "@/pages/Settings";
 
@@ -53,6 +55,8 @@ function App() {
             <Route path="/scoreandlive" element={<Protected><ScoreAndLive /></Protected>} />
             <Route path="/scoreandlive/:tid" element={<Protected><ScoreAndLiveDetail /></Protected>} />
             <Route path="/bonus" element={<Protected><Bonus /></Protected>} />
+            <Route path="/fanta" element={<Protected><FantaGiornata /></Protected>} />
+            <Route path="/fanta/:leagueId" element={<Protected><FantaGiornataLeague /></Protected>} />
             <Route path="/admin" element={<Protected><Admin /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />

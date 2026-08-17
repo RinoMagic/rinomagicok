@@ -23,7 +23,7 @@ export default function Hub() {
     if (g.id === "thebesttiket") navigate("/tiket");
     else if (g.id === "surviva") navigate("/survival");
     else if (g.id === "scoreandlive") navigate("/scoreandlive");
-    else if (g.id === "fantagiornata") toast.info(`${g.name} — Prossimamente`);
+    else if (g.id === "fantagiornata") navigate("/fanta");
     else toast.info(`${g.name} — Prossimamente`);
   };
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Clock, Bell, FileText, Gavel } from "lucide-react";
+import { ChevronLeft, Clock, Bell, FileText, Gavel, Users, Lock, Unlock, KeyRound } from "lucide-react";
 import { api, apiUpload } from "@/lib/api";
 
 const SEASON = "2026-27";
@@ -17,6 +17,27 @@ export default function Admin() {
   const [busy, setBusy] = useState(false);
   const pdfRef = useRef(null);
   const xlsxRef = useRef(null);
+  const [users, setUsers] = useState([]);
+
+  const loadUsers = () => api("/auth/users").then(setUsers).catch((e) => toast.error(e.message));
+  useEffect(() => { loadUsers(); }, []);
+
+  const toggleBlock = async (u) => {
+    try {
+      await api(`/auth/users/${u.id}/${u.blocked ? "unblock" : "block"}`, { method: "POST" });
+      toast.success(u.blocked ? "Sbloccato" : "Bloccato");
+      loadUsers();
+    } catch (e) { toast.error(e.message); }
+  };
+  const resetPw = async (u) => {
+    const pw = window.prompt(`Nuova password per ${u.username || u.email} (min 8 caratteri):`);
+    if (!pw) return;
+    if (pw.length < 8) { toast.error("Minimo 8 caratteri"); return; }
+    try {
+      await api("/auth/users/reset-password", { method: "POST", body: { user_id: u.id, new_password: pw } });
+      toast.success("Password reimpostata");
+    } catch (e) { toast.error(e.message); }
+  };
 
   const loadCurrent = () => api("/deadlines/current", { }).then(setCurrent).catch(() => {});
   useEffect(() => { loadCurrent(); }, []);
@@ -110,6 +131,25 @@ export default function Admin() {
         {settleState && (
           <pre className="text-xs bg-[#0F1216] rounded-md p-3 overflow-auto max-h-40 text-[#94A3B8]">{JSON.stringify(settleState, null, 2)}</pre>
         )}
+      </Card>
+      <Card icon={Users} title={`Gestione utenti (${users.length})`}>
+        <div className="rounded-lg bg-[#0F1216] border border-white/10 divide-y divide-white/10 max-h-96 overflow-y-auto">
+          {users.map((u) => (
+            <div key={u.id} data-testid={`admin-user-${u.id}`} className="px-3 py-2.5 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate flex items-center gap-2">
+                  {u.username || u.email}
+                  {u.role === "admin" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B]">ADMIN</span>}
+                  {u.blocked && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#EF4444]/20 text-[#EF4444]">BLOCCATO</span>}
+                </div>
+              </div>
+              <button data-testid={`admin-user-reset-${u.id}`} onClick={() => resetPw(u)} title="Reset password" className="p-1.5 text-[#94A3B8] hover:text-white"><KeyRound size={16} /></button>
+              <button data-testid={`admin-user-block-${u.id}`} onClick={() => toggleBlock(u)} title={u.blocked ? "Sblocca" : "Blocca"} className={`p-1.5 ${u.blocked ? "text-[#00D95F]" : "text-[#EF4444]"} hover:brightness-125`}>
+                {u.blocked ? <Unlock size={16} /> : <Lock size={16} />}
+              </button>
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );
