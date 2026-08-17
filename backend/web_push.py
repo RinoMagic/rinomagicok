@@ -64,6 +64,7 @@ class BroadcastIn(BaseModel):
     body: str = Field(..., min_length=1, max_length=300)
     url: Optional[str] = Field(default=None, max_length=500)
     icon: Optional[str] = Field(default=None, max_length=500)
+    user_ids: Optional[List[str]] = None
 
 
 def _vapid_claims() -> Dict[str, str]:
@@ -218,6 +219,7 @@ def create_router(db, current_user, current_admin) -> APIRouter:
                 "url": body.url or "/hub",
                 "icon": body.icon,
             },
+            user_ids=body.user_ids,
         )
         # Log admin action
         await db.admin_actions.insert_one({

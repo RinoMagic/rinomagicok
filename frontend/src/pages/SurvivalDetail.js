@@ -5,6 +5,7 @@ import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3 } from "
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
+import NotifyBox from "@/components/NotifyBox";
 
 const SIGNS = ["1", "X", "2"];
 
@@ -19,6 +20,8 @@ export default function SurvivalDetail() {
   const [myPicks, setMyPicks] = useState({ picks: [], required: 0 });
   const [sel, setSel] = useState({}); // fixture_key -> sign
   const [summary, setSummary] = useState(null);
+  const [mdList, setMdList] = useState([]);
+  const [summaryMd, setSummaryMd] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -48,6 +51,10 @@ export default function SurvivalDetail() {
   }, [tid]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    api(`/sv/tournaments/${tid}/matchdays`).then((r) => setMdList(Array.isArray(r) ? r : (r.matchdays || []))).catch(() => {});
+  }, [tid]);
 
   const required = myPicks.required || locked.lives_left || 0;
   const selCount = Object.keys(sel).length;
@@ -85,9 +92,11 @@ export default function SurvivalDetail() {
     catch (e) { toast.error(e.message); }
   };
 
-  const loadSummary = async () => {
-    if (!md) { toast.info("Nessuna giornata attiva"); return; }
-    try { setSummary(await api(`/sv/tournaments/${tid}/matchdays/${md.id}/summary`)); }
+  const loadSummary = async (mdId) => {
+    const id = mdId || md?.id;
+    if (!id) { toast.info("Nessuna giornata disponibile"); return; }
+    setSummaryMd(id);
+    try { setSummary(await api(`/sv/tournaments/${tid}/matchdays/${id}/summary`)); }
     catch (e) { toast.error(e.message); }
   };
 
@@ -173,10 +182,21 @@ export default function SurvivalDetail() {
       )}
 
       {(isAdmin || t.is_admin) && <InvitesManager basePath={`/sv/tournaments/${tid}`} />}
+      {(isAdmin || t.is_admin) && <NotifyBox userIds={(participants || []).map((e) => e.user_id)} url={`/survival/${tid}`} />}
 
       <div className="rounded-xl border border-white/10 bg-[#181D22] p-4">
-        <button data-testid="svd-summary-btn" onClick={loadSummary} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#F59E0B]">
-          <BarChart3 size={16} /> Riepilogo giornata {md?.matchday ?? t.current_matchday}
+        <div className="flex items-center gap-2 mb-2">
+          <BarChart3 size={16} className="text-[#F59E0B]" />
+          <span className="text-sm font-bold flex-1">Storico / Riepilogo giornata</span>
+          {mdList.length > 0 && (
+            <select data-testid="svd-md-select" value={summaryMd || md?.id || ""} onChange={(e) => loadSummary(e.target.value)} className="bg-[#0F1216] border border-white/15 rounded-md px-2 py-1 text-xs">
+              <option value="">Giornata…</option>
+              {mdList.map((m) => <option key={m.id} value={m.id}>G{m.matchday ?? m.matchday_number} {m.status === "settled" ? "✓" : ""}</option>)}
+            </select>
+          )}
+        </div>
+        <button data-testid="svd-summary-btn" onClick={() => loadSummary()} className="w-full text-sm font-bold text-[#F59E0B] border border-[#F59E0B]/30 rounded-md py-2">
+          Mostra riepilogo {md ? `giornata ${md.matchday ?? t.current_matchday}` : ""}
         </button>
         {summary && (
           <div className="mt-3 space-y-2">

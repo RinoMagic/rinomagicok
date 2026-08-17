@@ -5,6 +5,7 @@ import { ChevronLeft, Heart, Skull, Send, Copy, Trophy, BarChart3 } from "lucide
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
+import NotifyBox from "@/components/NotifyBox";
 
 export default function ScoreAndLiveDetail() {
   const { tid } = useParams();
@@ -15,6 +16,7 @@ export default function ScoreAndLiveDetail() {
   const [playersByTeam, setPlayersByTeam] = useState({});
   const [sel, setSel] = useState({}); // fixture_idx -> player_id
   const [summary, setSummary] = useState(null);
+  const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -60,6 +62,11 @@ export default function ScoreAndLiveDetail() {
   const loadSummary = async () => {
     if (!md) { toast.info("Nessuna giornata attiva"); return; }
     try { setSummary(await api(`/sal/tournaments/${tid}/matchdays/${md.id}/summary`)); }
+    catch (e) { toast.error(e.message); }
+  };
+
+  const loadHistory = async () => {
+    try { setHistory(await api(`/sal/tournaments/${tid}/history`)); }
     catch (e) { toast.error(e.message); }
   };
 
@@ -110,11 +117,43 @@ export default function ScoreAndLiveDetail() {
       )}
 
       {(isAdmin || t.is_admin) && <InvitesManager basePath={`/sal/tournaments/${tid}`} />}
+      {(isAdmin || t.is_admin) && <NotifyBox userIds={parts.map((p) => p.user_id)} url={`/scoreandlive/${tid}`} />}
 
       <div className="rounded-xl border border-white/10 bg-[#181D22] p-4">
-        <button data-testid="sald-summary-btn" onClick={loadSummary} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#3B82F6]">
-          <BarChart3 size={16} /> Riepilogo giornata {md?.matchday_number ?? ""}
+        <button data-testid="sald-history-btn" onClick={loadHistory} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#3B82F6]">
+          <BarChart3 size={16} /> Storico giornate
         </button>
+        {history && (
+          <div className="mt-3 space-y-3">
+            {(history.matchdays || []).filter((m) => m.status !== "open" || m.picks_visible).map((m) => (
+              <div key={m.id} data-testid={`sald-hist-${m.matchday_number}`} className="rounded-lg bg-[#0F1216] p-3">
+                <div className="text-sm font-bold flex items-center justify-between">
+                  <span>Giornata {m.matchday_number}</span>
+                  <span className="text-xs text-[#94A3B8] uppercase">{m.status}</span>
+                </div>
+                {(m.scorers || []).length > 0 && (
+                  <div className="text-xs text-[#00D95F] mt-1">Marcatori: {m.scorers.map((s) => s.player_name || s.player_id).join(", ")}</div>
+                )}
+                {(m.picks || []).length > 0 && (
+                  <div className="mt-2 space-y-0.5">
+                    {m.picks.map((pk, j) => (
+                      <div key={j} className="text-xs flex justify-between">
+                        <span className="text-white">{pk.nickname}</span>
+                        <span className={pk.outcome === "survived" ? "text-[#00D95F]" : pk.outcome === "eliminated" ? "text-[#EF4444]" : "text-[#94A3B8]"}>{pk.outcome || "—"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {(history.matchdays || []).length === 0 && <div className="text-xs text-[#64748B]">Nessuna giornata giocata.</div>}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><BarChart3 size={18} className="text-[#3B82F6]" /> Riepilogo giornata</h2>
+        <button data-testid="sald-summary-btn" onClick={loadSummary} className="w-full text-sm font-bold text-[#3B82F6] border border-[#3B82F6]/30 rounded-md py-2 mb-2">Mostra riepilogo giornata corrente</button>
         {summary && (
           <div className="mt-3 space-y-2">
             {(summary.fixtures || []).map((f, i) => (
@@ -142,7 +181,8 @@ export default function ScoreAndLiveDetail() {
       </div>
 
       <div>
-        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>
+        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
           {parts.map((p, i) => {
             const out = p.eliminated_at_matchday != null;
             return (

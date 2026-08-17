@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 5 backend + frontend testing of 3 new features: Notifiche Mirate (targeted push with user_ids filter), Storico Giornate (SAL /history + SV /matchdays + /summary by id), and Punteggi FantaGiornata (/results/{md} + /settle + /leaderboard). Backend: 11/11 pytest PASSED in ~44s (test_iter5_features.py). Frontend: found and fixed one CRITICAL runtime bug in SurvivalDetail.js (`entries is not defined` — the page crashed entirely). After the fix, /survival/{id} renders, notify box + summary + storico sections all functional, notify send returns 200 with success toast 'Notifica inviata (0 dispositivi)'. ScoreAndLiveDetail, FantaGiornataLeague (Punteggi tab + Calcola punti), TiketRoom notify boxes all render correctly and testids present. FG settle with no voti loaded returns 400 with Italian message 'Nessun voto per la giornata X. Carica prima il PDF Voti.' — EXPECTED behavior. Targeted broadcast returns {sent, expired_removed, failed, total_targeted}; total_targeted=0 for non-existent user id; non-admin gets 403. SAL /history returns 38 matchdays with picks_visible + scorers + picks fields. Cosmetic React hydration warning from iter4 (span in option in ScoreAndLiveDetail:107) still present.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SurvivalDetail.js:185", "issue": "ReferenceError: 'entries is not defined' — used undefined `entries` variable when passing userIds to <NotifyBox>. Whole /survival/{id} page crashed with red overlay. FIXED by replacing with `(participants || []).map((e) => e.user_id)`.", "selector": "route /survival/{tid}", "priority": "CRITICAL_FIXED"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ScoreAndLiveDetail (/scoreandlive/{id})", "issues": ["(pre-existing from iter4) React hydration warning: <span> cannot be a child of <option> at ScoreAndLiveDetail.js:107 — <option> content is wrapped in a <span>. Cosmetic only, no functional impact."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_features.py",
+    "/app/test_reports/pytest/iter5_results.xml"
+  ],
+  "action_items": [
+    "(Optional cleanup) The `svd-md-select` renders only when mdList.length > 0. If the survival tournament has only its current matchday (e.g., matchday 1 only), the select is hidden by design — verify this is intended UX (users may still want to reload the current matchday summary via the select).",
+    "(Optional) Fix long-standing cosmetic <span>-in-<option> warning at ScoreAndLiveDetail.js:107 by rendering plain text child."
+  ],
+  "critical_code_review_comments": [
+    "SurvivalDetail.js:185 used an undefined variable `entries` — clear runtime crash on every /survival/{id} route. Suggests the code was not smoke-tested before commit. Recommend enabling eslint no-undef in CI to catch such issues.",
+    "web_push.broadcast_push correctly filters by user_ids via `{'$in': list(user_ids)}` and returns total_targeted reflecting the filter — good. Non-admin dependency (current_admin) correctly enforces 403.",
+    "fantagiornata.py settle_matchday raises 400 when matchday_facts is empty — good UX message in Italian.",
+    "scoreandlive.py tournament_history correctly gates picks_visible by is_finished OR status locked/settled OR global deadline_passed — good visibility rule."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter5_features.py (NEW — 11 tests across 4 classes)",
+    "/app/frontend/src/pages/SurvivalDetail.js (FIXED — replaced undefined `entries` with `(participants || [])` at line 185)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% of tested flows (after 1 critical fix)"},
+  "test_credentials": "QA admin e1qa.admin@gmail.com / Test1234!, QA player e1_qa_player / Test1234! (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "Per module run: 1 sv tournament (TEST_HIST_SV_<ts>), 1 fg league (TEST_FG_PTS_<ts>). No 9 real users modified; sal_calendar/sal_players untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "4 backend test files now: test_rinomagic_flows.py (25), test_new_features.py (24), test_iter4_features.py (26), test_iter5_features.py (11). Set REACT_APP_BACKEND_URL env when running pytest locally: `export REACT_APP_BACKEND_URL=https://game-schedina.preview.emergentagent.com && pytest backend/tests/ -v`. Targeted push /api/push/broadcast now accepts optional `user_ids`; without subscriptions in DB, sent=0 but total_targeted still reflects the filter. FG /settle requires matchday_facts loaded (voti PDF) else 400. SurvivalDetail was crashing due to undefined `entries` var; now uses `participants`.",
+  "rca of the issue": "SurvivalDetail.js line 185 referenced `entries.map((e) => e.user_id)` when passing userIds to <NotifyBox>, but no `entries` variable existed in the component scope (only `participants` is defined via useState). Any user navigating to /survival/{tid} saw an 'Uncaught runtime error: entries is not defined' red overlay, so the notify box, storico dropdown (svd-md-select) and summary button (svd-summary-btn) never mounted. Fix: replaced with `(participants || []).map((e) => e.user_id)` — mirroring the pattern used in ScoreAndLiveDetail (`parts.map`), TiketRoom (`members.map`), and FantaGiornataLeague (`board.map`). After hot-reload, /survival/{id} renders, notify send returns 200, summary loads (with 'Conteggi nascosti per privacy' when few participants), and the toast 'Notifica inviata (0 dispositivi)' displays."
+}

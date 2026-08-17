@@ -5,6 +5,7 @@ import { ChevronLeft, Trophy, Search, X, Send, Shirt, ListChecks } from "lucide-
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
+import NotifyBox from "@/components/NotifyBox";
 
 const MODULES = {
   "3-4-3": { D: 3, C: 4, A: 3 }, "3-5-2": { D: 3, C: 5, A: 2 },
@@ -32,6 +33,7 @@ export default function FantaGiornataLeague() {
   const [results, setResults] = useState([]);
   const [board, setBoard] = useState([]);
   const [lineups, setLineups] = useState(null);
+  const [fgResults, setFgResults] = useState(null);
 
   const md = lg?.current_matchday_number || 1;
   const needs = { P: { s: 1, b: 2 }, D: { s: MODULES[module].D, b: 2 }, C: { s: MODULES[module].C, b: 2 }, A: { s: MODULES[module].A, b: 2 } };
@@ -54,9 +56,20 @@ export default function FantaGiornataLeague() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (tab === "classifica") api(`/fg/leagues/${leagueId}/leaderboard`).then((r) => setBoard(r.leaderboard || [])).catch(() => {});
+    if (tab === "classifica" || tab === "punteggi") api(`/fg/leagues/${leagueId}/leaderboard`).then((r) => setBoard(r.leaderboard || [])).catch(() => {});
     if (tab === "formazioni") api(`/fg/leagues/${leagueId}/lineups/${md}`).then(setLineups).catch(() => {});
+    if (tab === "punteggi") api(`/fg/leagues/${leagueId}/results/${md}`).then(setFgResults).catch(() => setFgResults({ results: [] }));
   }, [tab, leagueId, md]);
+
+  // Load members once for targeted notifications
+  useEffect(() => {
+    api(`/fg/leagues/${leagueId}/leaderboard`).then((r) => setBoard((b) => b.length ? b : (r.leaderboard || []))).catch(() => {});
+  }, [leagueId]);
+
+  const settleMd = async () => {
+    try { await api(`/fg/leagues/${leagueId}/settle`, { method: "POST", body: { matchday: md } }); toast.success("Punti calcolati!"); api(`/fg/leagues/${leagueId}/results/${md}`).then(setFgResults); }
+    catch (e) { toast.error(e.message); }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -109,9 +122,10 @@ export default function FantaGiornataLeague() {
       </div>
 
       {(isAdmin || lg.is_admin) && <InvitesManager basePath={`/fg/leagues/${leagueId}`} />}
+      {(isAdmin || lg.is_admin) && <NotifyBox userIds={board.map((m) => m.user_id)} url={`/fanta/${leagueId}`} />}
 
-      <div className="flex gap-2">
-        {[["formazione", "Formazione"], ["classifica", "Classifica"], ["formazioni", "Formazioni"]].map(([k, l]) => (
+      <div className="flex gap-2 flex-wrap">
+        {[["formazione", "Formazione"], ["classifica", "Classifica"], ["formazioni", "Formazioni"], ["punteggi", "Punteggi"]].map(([k, l]) => (
           <button key={k} data-testid={`fgl-tab-${k}`} onClick={() => setTab(k)} className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${tab === k ? "bg-[#A855F7] text-white" : "bg-[#181D22] border border-white/10 text-[#94A3B8]"}`}>{l}</button>
         ))}
       </div>
@@ -203,6 +217,32 @@ export default function FantaGiornataLeague() {
               ) : null}
             </div>
           ))}
+        </div>
+      )}
+      {tab === "punteggi" && (
+        <div className="space-y-3">
+          {(isAdmin || lg.is_admin) && (
+            <button data-testid="fgl-settle" onClick={settleMd} className="w-full bg-[#EF4444] text-white font-bold rounded-md py-2.5 text-sm">Calcola punti giornata {md} (dai voti caricati)</button>
+          )}
+          <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+            <div className="px-5 py-3 text-xs uppercase tracking-widest text-[#94A3B8]">Punti giornata {md}</div>
+            {(!fgResults || (fgResults.results || []).length === 0) ? (
+              <div className="px-5 py-6 text-center text-[#94A3B8] text-sm">Nessun punteggio: carica i voti dal Pannello Admin, poi premi "Calcola punti".</div>
+            ) : fgResults.results.map((r, i) => (
+              <div key={r.user_id} data-testid={`fgl-pts-${r.user_id}`} className="px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-6 text-[#94A3B8] font-bold">{i + 1}</span>
+                  <span className="flex-1 font-medium">{r.nickname}</span>
+                  <span className="font-extrabold text-[#A855F7]">{Number(r.total_fantavoto ?? r.total ?? 0).toFixed(1)}</span>
+                </div>
+                {Array.isArray(r.breakdown) && r.breakdown.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {r.breakdown.map((b, j) => (<span key={j} className="text-[11px] px-2 py-0.5 rounded bg-white/10">{(b.full_name || b.player_name)}: {b.fantavoto ?? b.vote ?? "-"}</span>))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

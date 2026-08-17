@@ -48,4 +48,10 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 - Verified: testing agent iteration_4 — backend 26/26, tutti i flussi UI, nessun bug funzionale.
 
 ## Status
-- Tutti i 4 giochi (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus attivi sul web. Backlog residuo: pannelli admin avanzati (settle-matchday UI più ricca, storici), rifiniture.
+- Tutti i 4 giochi (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus attivi sul web.
+
+## Implemented — iteration 4 (2026-06)
+- Storico Giornate: ScoreAndLive (`/sal/.../history`), Survival (selettore giornata + `/matchdays/{id}/summary`), FantaGiornata (scheda Punteggi con `/results/{md}`). Tiket: la classifica stanza è il risultato di giornata.
+- Punteggi FantaGiornata: scheda "Punteggi" con `total_fantavoto` per membro + breakdown; admin "Calcola punti" (`POST /fg/leagues/{id}/settle`) dai voti caricati.
+- Notifiche Mirate: `BroadcastIn.user_ids` + `broadcast_push` filtrato; componente NotifyBox (admin) in Tiket room, Survival, ScoreAndLive e FantaGiornata invia push solo ai partecipanti dell'entità.
+- Verified: testing agent iteration_5 — backend 11/11, frontend 100% (1 bug critico entries→participants corretto).

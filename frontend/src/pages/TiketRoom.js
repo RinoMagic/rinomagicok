@@ -5,6 +5,7 @@ import { ChevronLeft, Trophy, Users, Copy, Upload, CheckCircle2, Camera } from "
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
+import NotifyBox from "@/components/NotifyBox";
 
 export default function TiketRoom() {
   const { roomId } = useParams();
@@ -83,6 +84,7 @@ export default function TiketRoom() {
       </div>
 
       {(isAdmin || room.is_admin) && <InvitesManager basePath={`/rooms/${roomId}`} />}
+      {(isAdmin || room.is_admin) && <NotifyBox userIds={members.map((m) => m.user_id)} url={`/tiket/${roomId}`} />}
 
       {/* Schedina upload (OCR) */}
       <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/5 p-4 space-y-3">
