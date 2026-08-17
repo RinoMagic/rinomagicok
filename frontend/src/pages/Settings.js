@@ -67,6 +67,12 @@ export default function Settings() {
         </div>
       )}
 
+      {isAdmin && (
+        <button data-testid="set-admin-panel" onClick={() => navigate("/admin")} className="w-full rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 text-[#F59E0B] p-4 flex items-center justify-center gap-2 font-bold">
+          <Shield size={18} /> Pannello Admin
+        </button>
+      )}
+
       <button data-testid="set-logout" onClick={logout} className="w-full rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/10 text-[#EF4444] p-4 flex items-center justify-center gap-2 font-bold">
         <LogOut size={18} /> Esci
       </button>

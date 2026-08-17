@@ -22,6 +22,8 @@ export default function Hub() {
     }
     if (g.id === "thebesttiket") navigate("/tiket");
     else if (g.id === "surviva") navigate("/survival");
+    else if (g.id === "scoreandlive") navigate("/scoreandlive");
+    else if (g.id === "fantagiornata") toast.info(`${g.name} — Prossimamente`);
     else toast.info(`${g.name} — Prossimamente`);
   };
 
@@ -71,7 +73,7 @@ export default function Hub() {
 
           <button
             data-testid="game-card-bonus"
-            onClick={() => toast.info("Giochi Bonus — Prossimamente sul web")}
+            onClick={() => navigate("/bonus")}
             className="w-full flex items-center gap-4 p-4 rounded-2xl border border-[#10B981] bg-[#10B98112] text-left transition-transform hover:scale-[0.995]"
           >
             <div className="w-14 h-14 rounded-xl flex items-center justify-center bg-[#10B981] shrink-0">

@@ -9,6 +9,10 @@ import Survival from "@/pages/Survival";
 import SurvivalDetail from "@/pages/SurvivalDetail";
 import Tiket from "@/pages/Tiket";
 import TiketRoom from "@/pages/TiketRoom";
+import ScoreAndLive from "@/pages/ScoreAndLive";
+import ScoreAndLiveDetail from "@/pages/ScoreAndLiveDetail";
+import Bonus from "@/pages/Bonus";
+import Admin from "@/pages/Admin";
 import Settings from "@/pages/Settings";
 
 function Loader() {
@@ -46,6 +50,10 @@ function App() {
             <Route path="/survival/:tid" element={<Protected><SurvivalDetail /></Protected>} />
             <Route path="/tiket" element={<Protected><Tiket /></Protected>} />
             <Route path="/tiket/:roomId" element={<Protected><TiketRoom /></Protected>} />
+            <Route path="/scoreandlive" element={<Protected><ScoreAndLive /></Protected>} />
+            <Route path="/scoreandlive/:tid" element={<Protected><ScoreAndLiveDetail /></Protected>} />
+            <Route path="/bonus" element={<Protected><Bonus /></Protected>} />
+            <Route path="/admin" element={<Protected><Admin /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

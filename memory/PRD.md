@@ -28,7 +28,13 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 - Bonus/Big Match player screens; admin panels (deadlines, players, notifications broadcast, settle-matchday, PDF/Excel ingestion).
 - Invites management UI, room admin, kick, history views.
 
-## Notes
-- QA accounts (safe to delete): player `e1_qa_player`, admin `e1qa.admin@gmail.com`, password `Test1234!`.
-- Real users' plaintext passwords unknown (bcrypt) — reused untouched.
-- Backend regression suite: /app/backend/tests/test_rinomagic_flows.py.
+## Implemented — iteration 2 (2026-06)
+- Schedina OCR (TheBestTiket): upload foto giocata → POST /rooms/{id}/schedina/ocr (Gemini vision, EMERGENT_LLM_KEY) → anteprima → confirm; view my schedina. (hardened: corrupt image → 400)
+- Pannello Admin (/admin, admin-only via Impostazioni): scadenze giornata (PUT /deadlines/{md}), notifiche broadcast (/push/broadcast), import Voti PDF/Excel (/admin/voti/upload-pdf|xlsx), liquidazione giornata (/admin/settle-matchday/state|commit).
+- ScoreAndLive ATTIVO (GAMES enabled=true): lista/crea/iscrizione, dettaglio con pick marcatori (select per fixture, /sal/players?team), classifica sopravvivenza.
+- Giochi Bonus (/bonus): 4 tab (tiket/survival = risultato esatto; score/fanta = primo marcatore), config Big Match + invio pronostici per iscrizione.
+- Verified: testing agent iteration_3 — backend 24/24, tutti i flussi UI, nessun bug (1 minore OCR-500 su immagine corrotta → risolto).
+
+## Notes update
+- FantaGiornata resta PROSSIMAMENTE (backend router presente, UI non ancora costruita).
+- Regression suites: test_rinomagic_flows.py (25) + test_new_features.py (24).

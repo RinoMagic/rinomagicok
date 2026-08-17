@@ -74,7 +74,7 @@ GAMES: Dict[str, Dict[str, Any]] = {
         "tagline": "Indovina i marcatori e sopravvivi",
         "color": "#3B82F6",
         "icon": "pulse",
-        "enabled": False,
+        "enabled": True,
     },
     "fantagiornata": {
         "id": "fantagiornata",
@@ -832,7 +832,10 @@ async def ocr_screenshot(image_bytes: bytes, use_vision: bool = True) -> Dict[st
                 "sono disponibili. Riprova tra qualche secondo."
             ),
         )
-    original = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    try:
+        original = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Immagine non valida o corrotta")
     processed = _preprocess_image(image_bytes)
 
     best_text = ""

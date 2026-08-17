@@ -46,3 +46,19 @@ export async function api(path, opts = {}) {
   if (!res.ok) throw new Error(extractError(res.status, data));
   return data;
 }
+
+export async function apiUpload(path, file, params = {}) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const qs = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
+  const t = getToken();
+  const res = await fetch(`${API}${path}${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+    headers: t ? { Authorization: `Bearer ${t}` } : {},
+    body: form,
+  });
+  const ct = res.headers.get("content-type") || "";
+  const data = ct.includes("application/json") ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(extractError(res.status, data));
+  return data;
+}

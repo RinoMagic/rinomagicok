@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 3 E2E on the ORIGINAL FastAPI backend + React PWA for the 4 new features. Backend pytest: 24/24 PASSED in ~15s (see /app/backend/tests/test_new_features.py). Coverage: (1) /api/games regression → scoreandlive now enabled:true, tiket+surviva enabled, fantagiornata disabled — 4 games shape stable. (2) Schedina OCR: admin creates TEST_OCR_<ts> room game=thebesttiket, player joins by invite_code, POST /api/rooms/{id}/schedina/ocr with a valid 32x32 solid-black PNG returns 400 with 'schedina non corrispondente al sito staryes' (color anti-cheat correctly rejects — endpoint reachable & Gemini vision path executes successfully), GET /api/rooms/{id}/schedina returns 200/404. (3) Admin panel: PUT /api/deadlines/38 saves + GET /current returns dict, POST /api/push/broadcast returns {sent}, /admin/voti/upload-pdf and /admin/voti/upload-xlsx accept multipart 'file' with admin auth (bogus file → 400 as expected), GET /admin/settle-matchday/state returns dict, POST /admin/settle-matchday/commit returns 400 (missing voti) — all reachable, admin-only enforced (player 403). (4) ScoreAndLive full flow: create TEST_SAL_<ts> (initial_lives=3, start_matchday=1) → admin auto-enrolled → invite_code returned; player GET /sal/tournaments/by-code/<code> preview 200; POST /sal/tournaments/{id}/join with code 200; GET /sal/tournaments/{id} returns participants + matchdays + invite_code with open matchday; GET /sal/tournaments/{id}/matchdays/{md_id} returns fixtures[{idx,home_team,away_team}] + expected_picks_count=3 + my_lives_remaining=3; GET /sal/players?team=<Team> works; POST picks with 3 player_ids (each from a team of the target fixture) returns 200. (5) Bonus: GET /bonus/eligibility returns per-game booleans; GET /bonus/available?game=survival&season=2026-27 returns eligible=true + config (auto-created draft) + subscriptions (2 for admin); POST /bonus/picks/exact with a valid subscription_id and home/away scores returns 200 with pick.home_score=1; wrong subscription_id → 403. FRONTEND UI smoke on production URL: admin login OK; /admin renders all 9 admin-* testids (admin-md, admin-deadline, admin-deadline-save, admin-bc-title, admin-bc-body, admin-bc-send, admin-pdf, admin-xlsx, admin-settle-state, admin-settle-commit); /scoreandlive renders sal-join + sal-new (admin) and lists tournaments; /bonus renders all 4 tabs (tiket, survival, score, fanta) and 2 subscription cards with bonus-home/away/save testids; /settings shows 'Pannello Admin' button. No console errors on any page.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/rooms/{id}/schedina/ocr", "issue": "Corrupt/tiny image bytes that pass base64 decoding but fail PIL Image.open in the Tesseract fallback path leak an OSError → 500 Internal Server Error. Should be caught and returned as 400 'Immagine non valida'. Repro: send image_base64 of a raw 1x1 PNG hex 89504e47…; Vision LLM returns 0 events → fallback path calls Image.open(io.BytesIO(bytes)).convert('RGB') → PIL raises OSError('broken data stream'). File: /app/backend/thebesttiket.py:835 in ocr_screenshot. Fix: wrap the whole ocr_screenshot in try/except PIL.UnidentifiedImageError/OSError → HTTPException(400)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_rinomagic_flows.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "(Optional/minor) Wrap ocr_screenshot in try/except OSError|UnidentifiedImageError → return 400 'Immagine non valida' instead of 500 when a client uploads a corrupt image byte stream (production frontend won't hit this, but it hardens the endpoint against fuzz)."
+  ],
+  "critical_code_review_comments": [
+    "bonus.py `available` endpoint queries /bonus_configs with sort ('matchday', 1) — this correctly picks the earliest OPEN config, but if an admin creates a config for matchday N and then forgets to settle it, N+1's draft (auto-created by ensure_bonus_draft) will be shadowed forever. Consider also filtering by lock_at >= now or exposing an admin 'skip' action.",
+    "scoreandlive.py `_create_tournament_doc` auto-creates matchdays for the entire season upfront (start_matchday..38). For a mid-season create with 25 matchdays remaining this is fine, but it triggers 25 sal_matchdays.insert_many calls and, worse, if you re-run seed creation the sal_calendar sorting `sort('home_team', 1)` locks the fixture order to alphabetical rather than the official round schedule. Consider sorting by kickoff_iso when available.",
+    "thebesttiket.py `ocr_screenshot` (line 835): PIL Image.open + convert is not wrapped in try/except → any malformed image bytes leaked past base64 decode become 500. Recommendation: add specific handling (see backend_issues.minor).",
+    "Admin.js: `matchday` state is stored as string (from <input type=number>) and passed unconverted to `apiUpload(path, f, { matchday: md, season: SEASON })` — this multipart form field arrives as string on the backend which then parses it. Not a bug but tighten with `Number(md)` for consistency with the settle-commit call.",
+    "Bonus.js: `s.name || s.room_name || s.tournament_name` — the backend /bonus/subscriptions returns only `name`, so the fallbacks are dead code. Harmless."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py (new — 24 tests across 5 classes covering the 4 new features + games regression)"
+  ],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "100% of tested flows"},
+  "test_credentials": "QA admin e1qa.admin@gmail.com / Test1234! (email login), QA player e1_qa_player / Test1234! (username login) — sourced from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Each pytest run creates one TEST_OCR_<ts> tiket room (matchday=1, max_events=5, admin auto-enrolled, player joins via invite) and one TEST_SAL_<ts> scoreandlive tournament (initial_lives=3, start_matchday=1, admin auto-enrolled, invite_code fresh, player joins via /sal/tournaments/{id}/join). No modifications to sal_calendar, sal_players, or the 9 real users. Bonus configs auto-created (draft state) via ensure_bonus_draft on tournament create.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two backend test files now: /app/backend/tests/test_rinomagic_flows.py (auth+hub+survival+tiket regression, 25 tests) and /app/backend/tests/test_new_features.py (24 tests for the 4 new features). Both run in parallel via `pytest -n 2 loadscope` in ~35s combined. Export REACT_APP_BACKEND_URL from frontend/.env before running. Note: OCR endpoint's Tesseract fallback path throws OSError → 500 on malformed image bytes; use a valid PIL-generated PNG (see test_ocr_endpoint_reachable) to smoke-test it. ScoreAndLive matchday detail returns `expected_picks_count` and `my_lives_remaining` — clients must submit EXACTLY expected_picks_count picks, one per unique fixture_idx. Bonus 'available' auto-creates a matchday draft via ensure_bonus_draft when the admin creates any tournament/room/league.",
+  "rca of the issue": "OCR 500 on corrupt image: the tiny 1x1 PNG hex I used in the first test-run failed PIL Image.open in the Tesseract fallback (thebesttiket.py:835). Vision LLM (gemini-3-flash-preview) returned 0 events successfully, then the fallback path raised OSError('broken data stream when reading image file') which is uncaught in FastAPI and became 500. Fix in test: build a valid PNG via PIL — all 24 tests pass. Fix in code (minor, tracked as action item): wrap ocr_screenshot's PIL.Image.open in try/except and raise HTTPException(400, 'Immagine non valida')."
+}
