@@ -1,4 +1,4 @@
-import api, { API, getToken } from "./lib/api";
+import { api, getToken, API } from "./lib/api";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -21,16 +21,21 @@ export async function enablePush() {
 
   let subscription = await registration.pushManager.getSubscription();
   if (!subscription) {
-    const { data } = await api.get("/push/vapid-public-key");
+    const { publicKey } = await api("/push/vapid-public-key", { auth: false });
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
     });
   }
+  const json = subscription.toJSON();
   await fetch(`${API}/push/subscribe`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-    body: JSON.stringify(subscription.toJSON()),
+    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, user_agent: navigator.userAgent }),
   });
   return true;
+}
+
+export async function testPush() {
+  return api("/push/test", { method: "POST" });
 }

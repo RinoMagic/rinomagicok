@@ -4,17 +4,17 @@ import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
 import Login from "@/pages/Login";
-import Home from "@/pages/Home";
-import Tiket from "@/pages/Tiket";
+import Hub from "@/pages/Hub";
 import Survival from "@/pages/Survival";
-import Calendario from "@/pages/Calendario";
-import Giocatori from "@/pages/Giocatori";
-import Profilo from "@/pages/Profilo";
+import SurvivalDetail from "@/pages/SurvivalDetail";
+import Tiket from "@/pages/Tiket";
+import TiketRoom from "@/pages/TiketRoom";
+import Settings from "@/pages/Settings";
 
 function Loader() {
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="h-10 w-10 rounded-full border-2 border-white/10 border-t-[#0057B8] animate-spin" />
+      <div className="h-10 w-10 rounded-full border-2 border-white/10 border-t-[#F59E0B] animate-spin" />
     </div>
   );
 }
@@ -35,17 +35,18 @@ function LoginGate() {
 
 function App() {
   return (
-    <div className="App noise">
+    <div className="App">
+      <div className="app-bg" style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/stadium-bg.webp)` }} />
       <AuthProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginGate />} />
-            <Route path="/" element={<Protected><Home /></Protected>} />
-            <Route path="/tiket" element={<Protected><Tiket /></Protected>} />
+            <Route path="/" element={<Protected><Hub /></Protected>} />
             <Route path="/survival" element={<Protected><Survival /></Protected>} />
-            <Route path="/calendario" element={<Protected><Calendario /></Protected>} />
-            <Route path="/giocatori" element={<Protected><Giocatori /></Protected>} />
-            <Route path="/profilo" element={<Protected><Profilo /></Protected>} />
+            <Route path="/survival/:tid" element={<Protected><SurvivalDetail /></Protected>} />
+            <Route path="/tiket" element={<Protected><Tiket /></Protected>} />
+            <Route path="/tiket/:roomId" element={<Protected><TiketRoom /></Protected>} />
+            <Route path="/settings" element={<Protected><Settings /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

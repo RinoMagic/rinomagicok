@@ -1,0 +1,28 @@
+{
+  "summary": "RinoMagic Schedina Bar — full E2E on the ORIGINAL ported FastAPI backend + new React web PWA. Backend pytest: 25/25 PASSED (Auth admin+player+me+wrong-pw, /api/games shape (4 games, thebesttiket+surviva enabled, scoreandlive+fantagiornata disabled), full Survival flow (create → auto-enroll admin joined:true → invite_code returned → player join via code → current matchday with fixtures → locked-teams lives_left=3 → wrong pick count 400 → submit 3 picks on 3 different fixtures 200 → participants lists both users with lives), full Tiket flow (create room game=thebesttiket → list?game filter → player joins by code → GET room/leaderboard/members), PWA /manifest.json 200, /sw.js 200, /api/push/vapid-public-key). Frontend UI: Login page (data-testid auth-identifier/password/submit) works for both email->admin and username->player; Hub renders 4 game cards (TheBestTiket + Survival 2.0 active, ScoreAndLive + FantaGiornata show PROSSIMAMENTE badge) plus Giochi Bonus (NUOVO) card; /survival admin view has 'Nuovo' create action and lists existing TEST_SV_* tournaments with Iscritto badge; /tiket admin view has 'Nuova' create + 'Codice invito / Entra' join input + list of rooms; /settings has Notifiche push (Attiva/Test), Cambia password form (old + new), and 'Esci' logout button; logout+player login round-trip works; /manifest.json and /sw.js both served 200 from web root. No Expo/QR screens; Italian UI consistent; amber theme + stadium background render correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_rinomagic_flows.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "surviva.py submit_picks: excellent up-front validation (all-or-nothing) and pattern ^[1X2]$. Consider adding a unique index on (tournament_id, matchday_id, user_id) at the picks-submission level to guarantee idempotency under concurrent double-submit — index at line 233 is per-fixture only, which is correct for storage but doesn't protect against a race that writes N picks twice on retry.",
+    "thebesttiket.py /rooms/join: multi-entry behavior creates N memberships per user per room — intentional per docstring; make sure the frontend surfaces this clearly (otherwise a player could accidentally join twice and see two 'slot' entries).",
+    "auth.py CORS: allow_credentials=True + allow_origins=['*'] is invalid per CORS spec and will be silently ignored by browsers for credentialed requests. Since the app uses Bearer tokens (not cookies) this doesn't break auth, but the config should be tightened (either remove credentials=True, or list explicit origins).",
+    "auth.py APP_BASE_URL falls back to a stale hard-coded preview URL — since APP_BASE_URL is set in .env this is fine, but the default should be removed to fail-fast (matches project rule 'no default URLs').",
+    "surviva.py TournamentCreate: initial_lives capped ge=1 le=10 — DEFAULT_LIVES is 3 (matches product spec). Good.",
+    "server.py mounts routers before add_middleware(CORS...) — FastAPI executes middleware in reverse order at request time, so ordering is fine, but for clarity add CORS middleware BEFORE include_router of app."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rinomagic_flows.py (new — replaces obsolete iteration_1 test suite)"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% of tested flows"},
+  "test_credentials": "QA admin e1qa.admin@gmail.com / Test1234! (email), QA player e1_qa_player / Test1234! (username) — from /app/memory/test_credentials.md",
+  "seed_data_creation": "Each pytest run creates one fresh Survival tournament TEST_SV_<ts> (initial_lives=3, md=1, admin auto-enrolled, invite_code returned; then the player joins via that code and submits 3 picks) and one fresh TheBestTiket room TEST_TIK_<ts> (matchday=1, max_events=5) which the player joins. Real users, sal_calendar, sal_players untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test file /app/backend/tests/test_rinomagic_flows.py runs in ~22s with -n 2 loadscope. It uses REACT_APP_BACKEND_URL from env — export it before running (frontend/.env value). Admin login uses {email,password}, player uses {username,password}. Survival dynamic picks: required count == lives_left (starts at initial_lives). Tiket admin auto-enrolls ALL admins on room creation (multi-admin). Frontend token key is 'schedinabar_token'. All UI elements have data-testid (auth-identifier, auth-password, auth-submit, game-card-{id}). PWA assets served at /manifest.json and /sw.js from web root, VAPID key at /api/push/vapid-public-key.",
+  "rca of the issue": "n/a — no bugs found on this iteration."
+}

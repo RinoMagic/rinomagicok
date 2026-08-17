@@ -1,95 +1,107 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { apiError } from "@/lib/api";
-import { LogIn } from "lucide-react";
-
-const BG = "https://images.pexels.com/photos/32190700/pexels-photo-32190700.jpeg";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { loginAdmin, loginPlayer, register, forgot } = useAuth();
+  const [mode, setMode] = useState("login"); // login | register | forgot
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [ok, setOk] = useState(null);
+
+  const isEmail = (v) => v.includes("@");
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!identifier || !password) return;
-    setLoading(true);
+    setBusy(true); setErr(null); setOk(null);
     try {
-      const u = await login(identifier.trim(), password);
-      toast.success(`Bentornato, ${u.nickname}!`);
-    } catch (err) {
-      toast.error(apiError(err, "Credenziali non valide"));
+      const id = identifier.trim();
+      if (mode === "login") {
+        if (!id || !password) throw new Error("Inserisci email/nickname e password.");
+        if (isEmail(id)) await loginAdmin(id, password);
+        else await loginPlayer(id, password);
+      } else if (mode === "register") {
+        if (!id || !password) throw new Error("Inserisci nickname e password.");
+        if (isEmail(id)) throw new Error("Il nickname non può contenere una @.");
+        await register(id, password);
+      } else {
+        if (!id || !isEmail(id)) throw new Error("Inserisci una email valida.");
+        const res = await forgot(id);
+        setOk(res.message || "Se l'email è registrata, riceverai le istruzioni.");
+      }
+    } catch (e2) {
+      setErr(e2.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
+  const cta = mode === "login" ? "Accedi" : mode === "register" ? "Registrati" : "Invia link di reset";
+  const placeholder = mode === "login" ? "Email o Nickname" : mode === "register" ? "Nickname (2-20 caratteri)" : "Email admin";
+  const title = mode === "login" ? "Bentornato" : mode === "register" ? "Crea il tuo account" : "Recupero password";
+  const sub = mode === "login" ? "Accedi con la tua email admin o il tuo nickname."
+    : mode === "register" ? "Scegli un nickname e una password."
+    : "Riceverai un link per reimpostare la password.";
+
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
-      <div
-        className="hidden lg:block relative bg-cover bg-center"
-        style={{ backgroundImage: `url(${BG})` }}
-      >
-        <div className="absolute inset-0 bg-black/70" />
-        <div className="absolute bottom-12 left-12 right-12 z-10">
-          <div className="font-display text-6xl text-white leading-none">
-            IL BAR DELLE<br />SCHEDINE
-          </div>
-          <p className="mt-4 text-zinc-300 max-w-md">
-            Tiket, Survival e i tuoi pronostici sulla Serie A. Sfida gli amici, scala la classifica.
-          </p>
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col items-center gap-2 mb-6">
+          <img src="/barslot-logo.jpg" alt="RinoMagic" className="w-56 h-20 object-contain rounded-md" />
+          <div className="text-3xl font-black tracking-wider" style={{ textShadow: "0 2px 6px rgba(0,0,0,.6)" }}>RinoMagic</div>
+          <div className="w-14 h-1 rounded bg-[#F59E0B]" />
         </div>
-      </div>
 
-      <div className="flex items-center justify-center px-6 py-16 relative">
-        <div className="w-full max-w-sm">
-          <div className="flex items-center gap-3 mb-10">
-            <img src="/icon-192.png" alt="logo" className="h-12 w-12 rounded-sm" />
-            <div>
-              <div className="font-display text-3xl leading-none">SCHEDINA BAR</div>
-              <div className="text-[10px] tracking-[0.28em] text-[#00FF66] uppercase">Serie A 2026-27</div>
-            </div>
-          </div>
+        <div className="rounded-2xl border border-white/12 bg-[#0F172A]/70 backdrop-blur-md p-6 shadow-2xl">
+          <h1 className="text-xl font-extrabold text-center">{title}</h1>
+          <p className="text-sm text-white/70 text-center mt-1 mb-4">{sub}</p>
 
-          <h1 className="font-display text-4xl mb-1">ACCEDI</h1>
-          <p className="text-zinc-400 text-sm mb-8">Entra con username o email.</p>
-
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="text-xs tracking-[0.2em] uppercase text-zinc-500">Username o Email</label>
+          <form onSubmit={submit} className="space-y-3">
+            <input
+              data-testid="auth-identifier"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder={placeholder}
+              autoCapitalize="none"
+              className="w-full bg-white/8 border border-white/18 rounded-md px-4 py-3 text-white placeholder-white/50 outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
+            />
+            {mode !== "forgot" && (
               <input
-                data-testid="login-identifier-input"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                autoCapitalize="none"
-                autoCorrect="off"
-                className="mt-2 w-full bg-[#141414] border border-white/10 rounded-sm px-4 py-3 text-white outline-none focus:ring-2 focus:ring-[#0057B8] transition-colors"
-                placeholder="es. andr97"
-              />
-            </div>
-            <div>
-              <label className="text-xs tracking-[0.2em] uppercase text-zinc-500">Password</label>
-              <input
-                data-testid="login-password-input"
+                data-testid="auth-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full bg-[#141414] border border-white/10 rounded-sm px-4 py-3 text-white outline-none focus:ring-2 focus:ring-[#0057B8] transition-colors"
-                placeholder="••••••••"
+                placeholder="Password"
+                className="w-full bg-white/8 border border-white/18 rounded-md px-4 py-3 text-white placeholder-white/50 outline-none focus:ring-2 focus:ring-[#F59E0B] transition-colors"
               />
-            </div>
+            )}
+            {err && <p className="text-[#ff6b6b] text-sm text-center">{err}</p>}
+            {ok && <p className="text-[#4ade80] text-sm text-center">{ok}</p>}
             <button
-              data-testid="login-submit-button"
-              disabled={loading}
-              className="w-full bg-[#0057B8] hover:bg-[#00438F] disabled:opacity-50 text-white font-semibold rounded-sm px-4 py-3 flex items-center justify-center gap-2 transition-colors duration-200"
+              data-testid="auth-submit"
+              disabled={busy}
+              className="w-full h-12 rounded-lg bg-[#F59E0B] text-[#1A1000] font-extrabold tracking-wide disabled:opacity-60 hover:brightness-105 transition-all"
             >
-              <LogIn size={18} />
-              {loading ? "Accesso..." : "Accedi"}
+              {busy ? "..." : cta}
             </button>
           </form>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-sm font-bold">
+            {mode === "login" && (
+              <>
+                <button data-testid="go-register" onClick={() => { setMode("register"); setErr(null); setOk(null); setPassword(""); }}>Registrati</button>
+                <span className="text-white/40">•</span>
+                <button data-testid="go-forgot" onClick={() => { setMode("forgot"); setErr(null); setOk(null); setPassword(""); }}>Password dimenticata?</button>
+              </>
+            )}
+            {mode !== "login" && (
+              <button data-testid="go-login" onClick={() => { setMode("login"); setErr(null); setOk(null); }}>← Torna al login</button>
+            )}
+          </div>
         </div>
+
+        <p className="text-center text-white/55 text-xs italic mt-5">Chi ha la quota più bassa, paga da bere.</p>
       </div>
     </div>
   );

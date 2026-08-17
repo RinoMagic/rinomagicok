@@ -3,75 +3,50 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 4%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 8%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 212 100% 36%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 12%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 63%;
-  --accent: 0 0% 12%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 1 78% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 100% / 0.1;
-  --input: 0 0% 16%;
-  --ring: 212 100% 36%;
-  --radius: 0.25rem;
+  --brand: #F59E0B;
+  --brand-on: #1A1000;
+  --surface: #0F1216;
+  --surface-2: #181D22;
+  --surface-3: #242A31;
+  --on-surface: #F1F5F9;
+  --muted: #94A3B8;
+  --border: #2B333B;
+  --accent: #00D95F;
+  --radius: 12px;
 }
 
-* {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-html, body, #root {
-  min-height: 100%;
-}
+* { border-color: var(--border); }
+html, body, #root { min-height: 100%; }
 
 body {
   margin: 0;
-  background-color: #0a0a0a;
-  color: #ffffff;
-  font-family: "Manrope", system-ui, sans-serif;
+  color: var(--on-surface);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: 0.01em;
-  background-image:
-    radial-gradient(1200px 500px at 100% -10%, rgba(0, 87, 184, 0.14), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(0, 255, 102, 0.06), transparent 55%);
-  background-attachment: fixed;
+  background: #0a0f19;
 }
 
-.font-display {
-  font-family: "Bebas Neue", "Manrope", sans-serif;
-  letter-spacing: 0.02em;
+/* App-wide stadium background with dark overlay (mirrors _layout.tsx).
+   The image is applied via an inline-styled div (.app-bg) in App.js because
+   CRA's css-loader tries to resolve url() paths as modules. */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
 }
-
-.noise::before {
+#root::after {
   content: "";
   position: fixed;
   inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: -1;
+  background: rgba(10, 15, 25, 0.82);
 }
 
-::selection {
-  background: #00ff66;
-  color: #000;
-}
-
+::selection { background: var(--brand); color: var(--brand-on); }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb { background: #262626; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #2B333B; border-radius: 4px; }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeup { animation: fadeUp 0.4s ease-out both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.animate-fadeup { animation: fadeUp .35s ease-out both; }

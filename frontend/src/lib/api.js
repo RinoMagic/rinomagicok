@@ -1,41 +1,48 @@
-import axios from "axios";
-
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
-const TOKEN_KEY = "sb_token";
+const TOKEN_KEY = "schedinabar_token";
+const USER_KEY = "schedinabar_user";
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const setSession = (token, user) => {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+};
+export const clearSession = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+};
+export const getStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; }
+};
 
-const api = axios.create({ baseURL: API });
-
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err.response?.status === 401 && getToken()) {
-      clearToken();
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
-      }
+function extractError(status, data) {
+  let msg = `Errore ${status}`;
+  if (data && typeof data === "object" && data.detail) {
+    if (typeof data.detail === "string") msg = data.detail;
+    else if (Array.isArray(data.detail)) {
+      const f = data.detail[0];
+      if (f?.msg) msg = String(f.msg).replace(/^Value error,\s*/i, "");
     }
-    return Promise.reject(err);
   }
-);
-
-export function apiError(err, fallback = "Si è verificato un errore.") {
-  const d = err?.response?.data?.detail;
-  if (!d) return err?.message || fallback;
-  if (typeof d === "string") return d;
-  if (Array.isArray(d)) return d.map((e) => e?.msg || JSON.stringify(e)).join(" ");
-  return String(d);
+  return msg;
 }
 
-export default api;
+export async function api(path, opts = {}) {
+  const { method = "GET", body, auth = true } = opts;
+  const headers = { "Content-Type": "application/json" };
+  if (auth) {
+    const t = getToken();
+    if (t) headers.Authorization = `Bearer ${t}`;
+  }
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const ct = res.headers.get("content-type") || "";
+  const data = ct.includes("application/json") ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(extractError(res.status, data));
+  return data;
+}

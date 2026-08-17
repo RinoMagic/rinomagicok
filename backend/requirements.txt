@@ -20,6 +20,7 @@ dnspython==2.8.0
 ecdsa==0.19.2
 email-validator==2.3.0
 emergentintegrations==0.2.0
+et_xmlfile==2.0.0
 execnet==2.1.2
 fastapi==0.110.1
 fastuuid==0.14.0
@@ -67,10 +68,13 @@ mypy_extensions==1.1.0
 numpy==2.4.6
 oauthlib==3.3.1
 openai==1.99.9
+openpyxl==3.1.5
 packaging==26.3
 pandas==3.0.5
 passlib==1.7.4
 pathspec==1.1.1
+pdfminer.six==20260107
+pdfplumber==0.11.10
 pillow==12.3.0
 platformdirs==4.11.3
 pluggy==1.6.0
@@ -89,6 +93,8 @@ Pygments==2.20.0
 PyJWT==2.13.0
 pymongo==4.6.3
 pyparsing==3.3.2
+pypdfium2==5.13.0
+pytesseract==0.3.13
 pytest==9.1.1
 pytest-xdist==3.8.0
 python-dateutil==2.9.0.post0
@@ -100,6 +106,7 @@ pywebpush==2.4.0
 PyYAML==6.0.3
 referencing==0.37.0
 regex==2026.7.19
+reportlab==5.0.0
 requests==2.34.2
 requests-oauthlib==2.0.0
 rich==15.0.0

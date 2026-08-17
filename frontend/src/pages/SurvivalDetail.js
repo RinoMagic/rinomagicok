@@ -1,0 +1,185 @@
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy } from "lucide-react";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+
+const SIGNS = ["1", "X", "2"];
+
+export default function SurvivalDetail() {
+  const { tid } = useParams();
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const [t, setT] = useState(null);
+  const [md, setMd] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [locked, setLocked] = useState({ locked_teams: [], lives_left: 0 });
+  const [myPicks, setMyPicks] = useState({ picks: [], required: 0 });
+  const [sel, setSel] = useState({}); // fixture_key -> sign
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const tour = await api(`/sv/tournaments/${tid}`);
+      setT(tour);
+      const parts = await api(`/sv/tournaments/${tid}/participants`);
+      setParticipants(parts);
+      if (tour.joined) {
+        const lk = await api(`/sv/tournaments/${tid}/locked-teams`).catch(() => ({ locked_teams: [], lives_left: 0 }));
+        setLocked(lk);
+      }
+      try {
+        const cur = await api(`/sv/tournaments/${tid}/matchdays/current`);
+        setMd(cur);
+        if (tour.joined) {
+          const mp = await api(`/sv/tournaments/${tid}/matchdays/${cur.id}/my-picks`).catch(() => ({ picks: [], required: 0 }));
+          setMyPicks(mp);
+          const pre = {};
+          (mp.picks || []).forEach((p) => { pre[`${p.home_team}||${p.away_team}`] = p.pick; });
+          setSel(pre);
+        }
+      } catch { setMd(null); }
+    } catch (e) { toast.error(e.message); }
+    finally { setLoading(false); }
+  }, [tid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const required = myPicks.required || locked.lives_left || 0;
+  const selCount = Object.keys(sel).length;
+
+  const toggle = (home, away, sign) => {
+    const key = `${home}||${away}`;
+    setSel((prev) => {
+      const next = { ...prev };
+      if (next[key] === sign) { delete next[key]; return next; }
+      if (!next[key] && selCount >= required) {
+        toast.warning(`Puoi selezionare solo ${required} partite (1 per vita).`);
+        return prev;
+      }
+      next[key] = sign;
+      return next;
+    });
+  };
+
+  const submit = async () => {
+    const picks = Object.entries(sel).map(([k, pick]) => {
+      const [home_team, away_team] = k.split("||");
+      return { home_team, away_team, pick };
+    });
+    if (picks.length !== required) { toast.error(`Devi inviare esattamente ${required} pronostici.`); return; }
+    try {
+      await api(`/sv/tournaments/${tid}/matchdays/${md.id}/picks`, { method: "POST", body: { picks } });
+      toast.success("Pronostici inviati!");
+      load();
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const join = async () => {
+    if (!t?.invite_code) return;
+    try { await api("/sv/tournaments/join", { method: "POST", body: { invite_code: t.invite_code } }); toast.success("Iscritto!"); load(); }
+    catch (e) { toast.error(e.message); }
+  };
+
+  if (loading || !t) return <div className="py-16 text-center text-[#94A3B8]">Caricamento...</div>;
+
+  const alive = !myPicks && false;
+  const lockedSet = new Set(locked.locked_teams || []);
+
+  return (
+    <div className="space-y-5">
+      <button data-testid="svd-back" onClick={() => navigate("/survival")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Tornei</button>
+
+      <div className="rounded-xl border border-white/10 bg-[#181D22] p-4">
+        <div className="text-2xl font-extrabold">{t.name}</div>
+        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-[#94A3B8]">
+          <span>Giornata <b className="text-white">{t.current_matchday}</b></span>
+          <span className="text-[#EF4444] flex items-center gap-1"><Heart size={14} /> {t.players_alive}/{t.players_total} vivi</span>
+          {t.joined && <span className="text-[#F59E0B] flex items-center gap-1"><Heart size={14} /> Le tue vite: {locked.lives_left}</span>}
+          {t.status === "finished" && <span className="text-[#F59E0B] font-bold">Concluso</span>}
+        </div>
+        {(isAdmin || t.is_admin) && t.invite_code && (
+          <button data-testid="svd-copy-code" onClick={() => { navigator.clipboard?.writeText(t.invite_code); toast.success("Codice copiato"); }} className="mt-3 inline-flex items-center gap-2 text-xs bg-white/10 rounded-md px-3 py-1.5">
+            <Copy size={13} /> Codice invito: <b>{t.invite_code}</b>
+          </button>
+        )}
+        {!t.joined && t.status !== "finished" && (
+          <button data-testid="svd-join" onClick={join} className="mt-3 w-full bg-[#00D95F] text-[#08110A] font-bold rounded-md py-2.5">Iscriviti a questo torneo</button>
+        )}
+      </div>
+
+      {t.joined && locked.locked_teams?.length > 0 && (
+        <div className="rounded-lg bg-[#242A31] p-3 text-sm">
+          <div className="text-xs uppercase tracking-widest text-[#94A3B8] mb-1 flex items-center gap-1"><Lock size={12} /> Squadre bloccate</div>
+          <div className="flex flex-wrap gap-1.5">
+            {locked.locked_teams.map((tm) => <span key={tm} className="px-2 py-0.5 rounded bg-white/10 text-xs">{tm}</span>)}
+          </div>
+        </div>
+      )}
+
+      {t.joined && md && !md.settled && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-extrabold">Pronostici · G{md.matchday}</h2>
+            <span className={`text-sm font-bold ${selCount === required ? "text-[#00D95F]" : "text-[#F59E0B]"}`}>{selCount}/{required} scelti</span>
+          </div>
+          {md.locked ? (
+            <div className="rounded-lg bg-[#242A31] p-4 text-center text-[#94A3B8] flex items-center justify-center gap-2"><Lock size={16} /> Giornata chiusa: pronostici bloccati.</div>
+          ) : required === 0 ? (
+            <div className="rounded-lg bg-[#EF4444]/10 border border-[#EF4444]/40 p-4 text-center text-[#EF4444] flex items-center justify-center gap-2"><Skull size={16} /> Sei stato eliminato.</div>
+          ) : (
+            <>
+              <p className="text-xs text-[#94A3B8] mb-2">Scegli {required} partite diverse (una per vita) e il segno 1/X/2.</p>
+              <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+                {(md.fixtures || []).map((f, i) => {
+                  const key = `${f.home_team}||${f.away_team}`;
+                  const cur = sel[key];
+                  const postponed = f.postponed_before;
+                  return (
+                    <div key={i} data-testid={`svd-fixture-${i}`} className={`px-3 py-3 ${postponed ? "opacity-40" : ""}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm flex-1 min-w-0">
+                          <span className={lockedSet.has(f.home_team) ? "text-[#F59E0B]" : ""}>{f.home_team}</span>
+                          <span className="text-[#94A3B8] mx-1">-</span>
+                          <span className={lockedSet.has(f.away_team) ? "text-[#F59E0B]" : ""}>{f.away_team}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {SIGNS.map((s) => (
+                            <button key={s} data-testid={`svd-sign-${i}-${s}`} disabled={postponed} onClick={() => toggle(f.home_team, f.away_team, s)}
+                              className={`h-9 w-9 rounded-md border font-bold transition-colors ${cur === s ? "bg-[#00D95F] border-[#00D95F] text-[#08110A]" : "bg-[#0F1216] border-white/15 text-white hover:border-white/40"}`}>{s}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button data-testid="svd-submit" onClick={submit} disabled={selCount !== required} className="mt-3 w-full bg-[#F59E0B] text-[#1A1000] font-extrabold rounded-md py-3 flex items-center justify-center gap-2 disabled:opacity-50">
+                <Send size={18} /> Invia {required} pronostici
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>
+        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+          {participants.map((p, i) => {
+            const out = p.eliminated_at != null;
+            return (
+              <div key={p.user_id} data-testid={`svd-part-${p.user_id}`} className="px-4 py-3 flex items-center gap-3">
+                <span className="w-6 text-[#94A3B8] font-bold">{i + 1}</span>
+                {out ? <Skull size={16} className="text-white/40" /> : <Heart size={16} className="text-[#EF4444]" />}
+                <span className={`flex-1 ${out ? "line-through text-white/40" : "font-medium"}`}>{p.nickname}</span>
+                <span className="text-sm font-bold" style={{ color: out ? "#64748B" : "#EF4444" }}>{out ? "Fuori" : `${p.lives_left} ♥`}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

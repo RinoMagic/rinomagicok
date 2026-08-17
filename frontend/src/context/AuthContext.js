@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import api, { setToken, clearToken, getToken } from "../lib/api";
+import { api, setSession, clearSession, getStoredUser, getToken } from "../lib/api";
 
 const AuthContext = createContext(null);
 
@@ -7,17 +7,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // null = checking
   const [ready, setReady] = useState(false);
 
-  const loadMe = useCallback(async () => {
-    if (!getToken()) {
-      setUser(false);
-      setReady(true);
-      return;
-    }
+  const refresh = useCallback(async () => {
+    if (!getToken()) { setUser(false); setReady(true); return; }
     try {
-      const { data } = await api.get("/auth/me");
-      setUser(data);
-    } catch (_) {
-      clearToken();
+      const me = await api("/auth/me");
+      setUser(me);
+      setSession(getToken(), me);
+    } catch {
+      clearSession();
       setUser(false);
     } finally {
       setReady(true);
@@ -25,23 +22,30 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    loadMe();
-  }, [loadMe]);
+    const stored = getStoredUser();
+    if (stored) setUser(stored);
+    refresh();
+  }, [refresh]);
 
-  const login = async (identifier, password) => {
-    const { data } = await api.post("/auth/login", { identifier, password });
-    setToken(data.token);
-    setUser(data.user);
-    return data.user;
+  const loginAdmin = async (email, password) => {
+    const res = await api("/auth/admin/login", { method: "POST", auth: false, body: { email, password } });
+    setSession(res.token, res.user); setUser(res.user); return res.user;
   };
+  const loginPlayer = async (username, password) => {
+    const res = await api("/auth/player/login", { method: "POST", auth: false, body: { username, password } });
+    setSession(res.token, res.user); setUser(res.user); return res.user;
+  };
+  const register = async (username, password) => {
+    const res = await api("/auth/player/register", { method: "POST", auth: false, body: { username, password } });
+    setSession(res.token, res.user); setUser(res.user); return res.user;
+  };
+  const forgot = async (email) =>
+    api("/auth/admin/forgot-password", { method: "POST", auth: false, body: { email } });
 
-  const logout = () => {
-    clearToken();
-    setUser(false);
-  };
+  const logout = () => { clearSession(); setUser(false); };
 
   return (
-    <AuthContext.Provider value={{ user, ready, login, logout, isAdmin: user?.role === "admin" }}>
+    <AuthContext.Provider value={{ user, ready, loginAdmin, loginPlayer, register, forgot, logout, isAdmin: user?.role === "admin", refresh }}>
       {children}
     </AuthContext.Provider>
   );

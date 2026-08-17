@@ -1,35 +1,34 @@
-# Schedina Bar — PRD
+# RinoMagic (Schedina Bar) — PRD
 
 ## Original Problem
-Rebuild the RinoMagic "Schedina Bar" app as a standard React WEB PWA (NOT Expo/Mobile), reusing the existing FastAPI logic and the existing MongoDB Atlas DB (`schedinabar`). Replicate the 4 games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Installable PWA with manifest + service worker for Web Push (VAPID). Italian UI. Do not modify existing Atlas data (1479 calendar matches, 497 players, real users).
+Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
+
+## Approach (this iteration)
+- The GitHub repo was made public; the ORIGINAL FastAPI backend (server.py + auth.py + thebesttiket.py + surviva.py + scoreandlive.py + fantagiornata.py + bonus.py + deadlines.py + matchday_facts.py + matchday_settle.py + web_push.py + schedina_vision.py + excel_parser.py + email_service.py) was copied into /app/backend and runs as-is against Atlas.
+- Startup index creation made best-effort (existing prod indexes differ) to avoid crashes; NO data modified.
+- Frontend fully rewritten in React web (Expo removed): amber "bar" theme, stadium background, RinoMagic/BARSLOT branding.
 
 ## Architecture
-- Frontend: React 19 (CRACO) PWA — manifest.json, sw.js, app icons. Tailwind + shadcn. Dark "Performance Pro" theme (Bebas Neue + Manrope). Bearer-token auth (localStorage `sb_token`).
-- Backend: FastAPI, all routes under `/api`. Modules: `server.py` (games), `auth.py` (JWT + bcrypt login by username/email), `web_push.py` (VAPID push), `database.py` (Motor client).
-- DB: MongoDB Atlas `schedinabar`. Season used: `2026-27` (380 matches, 20 teams, 38 matchdays).
-
-## User Personas
-- Player (7 real + QA): plays Tiket/Survival, submits predictions, views standings.
-- Admin (2 real + QA): creates Tiket rounds & Survival tournaments, enters results, sends push.
+- Backend: FastAPI, all routes under /api. Auth = JWT (admin by email, player by username), bcrypt. Games: Tiket at /api/rooms + /api/games; Survival at /api/sv/*; ScoreAndLive /api/sal/*; FantaGiornata /api/fg/*; Bonus /api/bonus/*; Deadlines /api/deadlines/*; Push /api/push/*.
+- Frontend: React 19 (CRACO) PWA. Routes: /login, / (Hub), /survival, /survival/:tid, /tiket, /tiket/:roomId, /settings. Token in localStorage `schedinabar_token`.
+- DB: MongoDB Atlas `schedinabar`, season 2026-27.
 
 ## Implemented (2026-06)
-- Auth: login by username OR email + bcrypt against existing `password_hash`; `/api/auth/me`; role-based admin guard.
-- Serie A reference: matchdays, teams, calendar by matchday, players (filter role/team/search + pagination).
-- Tiket (complete): admin create round (matchday + deadline + Big Match), player submit schedina (1/X/2, all fixtures required), admin set results → scoring (normal=1, big=2, big+bonus=3), general standings.
-- Survival (complete): admin create tournament, join, pick a team per matchday (no reuse), admin resolve (winners survive / others + non-pickers eliminated), matchday advance, participants list.
-- ScoreAndLive & FantaGiornata: shown on Home with "Prossimamente" badge (inactive).
-- PWA + Web Push: manifest, service worker, VAPID public key endpoint, subscribe (auth), admin send; push fired on round/tournament creation & result events.
-- Pages: Login, Home, Tiket, Survival, Calendario, Giocatori, Profilo. Italian UI, bottom nav.
-- Verified: testing agent iteration_1 — backend 19/19, all frontend flows pass.
+- Login (admin email / player username / register / forgot) — faithful.
+- Hub via /api/games with color-coded cards; ScoreAndLive + FantaGiornata show PROSSIMAMENTE; Giochi Bonus card (info).
+- Survival 2.0: list, create (admin), join by code, detail with current-matchday 1/X/2 picks (dynamic count = lives), locked teams, participants/leaderboard.
+- TheBestTiket: rooms list, create (admin), join by code, room detail with leaderboard + members + invite code.
+- Settings: enable/test web push, admin change-password, logout.
+- PWA: manifest + sw.js + icons; VAPID push wired to real backend.
+- Verified: testing agent iteration_2 — backend 25/25, all frontend flows pass, no bugs.
 
-## Backlog
-- P1: ScoreAndLive game (uses sal_* collections).
-- P1: FantaGiornata game (fg_* collections: leagues, lineups, results).
-- P2: Tiket private rooms/invites; per-matchday standings; deadline countdown UI.
-- P2: Survival invites/private tournaments; auto-resolve from live results.
-- P2: Admin dashboard for user management & push composer.
+## Backlog / Not yet on web
+- Tiket schedina submission via OCR screenshot upload (thebesttiket schedina/ocr + confirm) — backend present, web UI pending.
+- ScoreAndLive and FantaGiornata screens (backend routers present; Hub marks PROSSIMAMENTE).
+- Bonus/Big Match player screens; admin panels (deadlines, players, notifications broadcast, settle-matchday, PDF/Excel ingestion).
+- Invites management UI, room admin, kick, history views.
 
 ## Notes
-- QA accounts (safe to delete): `e1_qa_player` / `e1_qa_admin`, password `Test1234!`.
-- Real users' plaintext passwords unknown (bcrypt only) — reused as-is, untouched.
-- Backend regression suite: `/app/backend/tests/test_backend.py`.
+- QA accounts (safe to delete): player `e1_qa_player`, admin `e1qa.admin@gmail.com`, password `Test1234!`.
+- Real users' plaintext passwords unknown (bcrypt) — reused untouched.
+- Backend regression suite: /app/backend/tests/test_rinomagic_flows.py.
