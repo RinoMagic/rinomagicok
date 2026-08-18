@@ -3,7 +3,11 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
-## Fix — Classifica Survival + dettaglio giocata (come originale) (2026-06)
+## Nota — Giocata di default Survival (auto-pick) (2026-06)
+- La funzione ERA già presente e attiva nel backend (`surviva.py::_auto_fill_default_picks`, chiamata a STEP 0 di `POST /sv/.../settle`, invocata anche dal flusso admin unificato `matchday_settle`). Al momento della liquidazione, ai giocatori che non hanno inviato la giocata vengono assegnati pronostici di default: prima partita utile a scendere, segno "1" (o "2" se casa bloccata, "X" se entrambe bloccate). Verificato sui dati reali (e1qa.admin/prova1/veroneandrea055 hanno preso picks `auto_generated` in G1).
+- Frontend: aggiunta etichetta **AUTO** ai pick auto-generati nel `SurvivaPicksModal` per renderli riconoscibili. Nessuna modifica al backend.
+
+
 - Ripristinata la riga classifica Survival identica all'originale: `#rank`, nickname, stato ("Giocata inserita"/"In attesa di giocata"/"Eliminato · G{n}") e colonna badge — **cuore grigio** `pick_lives` (vite da pronostici), **regalo** `+bonus_wins`, **cuore rosso** `lives_left` (vite totali). Riga cliccabile.
 - `SurvivalDetail.js` ora carica la classifica da `/sv/tournaments/{id}/leaderboard` (campi rank/pick_lives/bonus_wins/lives_left/has_submitted_current/eliminated).
 - Nuovo `components/SurvivaPicksModal.js` (porting web del modal Expo): al click su un giocatore apre `/sv/tournaments/{id}/participants/{uid}/picks`, mostra le giocate per giornata con 🎁 se big match bonus vinto, badge stato (Calcolata/Chiusa/Aperta), scelte con segno colorato (verde ok / rosso HeartCrack ko / clock na) o "nascosti". Vista sintetizzata: mostra solo giornate liquidate/chiuse/con giocate.

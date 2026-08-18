@@ -66,7 +66,10 @@ export function SurvivaPicksModal({ tid, row, onClose }) {
                     const outcome = md.settled ? (p.correct === true ? "ok" : p.correct === false ? "ko" : "na") : "na";
                     return (
                       <div key={i} className="flex items-center gap-2 py-1">
-                        <span className="flex-1 min-w-0 truncate text-sm">{p.home_team} <span className="text-[#94A3B8]">-</span> {p.away_team}</span>
+                        <span className="flex-1 min-w-0 truncate text-sm flex items-center gap-1.5">
+                          {p.home_team} <span className="text-[#94A3B8]">-</span> {p.away_team}
+                          {p.auto_generated && <span title="Giocata di default assegnata automaticamente" className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-[#94A3B8] font-bold shrink-0">AUTO</span>}
+                        </span>
                         <span className={`min-w-7 text-center px-2 py-0.5 rounded border text-sm font-extrabold ${outcome === "ok" ? "border-[#00D95F] bg-[#00D95F]/15 text-[#00D95F]" : outcome === "ko" ? "border-[#EF4444] bg-[#EF4444]/15 text-[#EF4444]" : "border-white/15 text-white"}`}>{p.pick}</span>
                         <span className="w-6 flex items-center justify-center">
                           {outcome === "ok" && <CheckCircle2 size={18} className="text-[#00D95F]" />}
