@@ -220,20 +220,30 @@ export default function SurvivalDetail() {
           <FileDown size={16} /> Esporta PDF (riepilogo + classifica)
         </button>
         {summary && (
-          <div className="mt-3 space-y-2">
-            {summary.counts_hidden && <div className="text-xs text-[#94A3B8]">Conteggi nascosti per privacy (pochi superstiti) fino al calcio d'inizio.</div>}
+          <div className="mt-3 space-y-3">
+            <div className={`rounded-lg border p-3 flex items-start gap-2 text-xs ${summary.counts_hidden ? "border-white/10 bg-[#181D22] text-[#94A3B8]" : "border-[#F59E0B]/40 bg-[#F59E0B]/5 text-[#F8C471]"}`}>
+              <BarChart3 size={15} className="shrink-0 mt-0.5" />
+              <span>{summary.counts_hidden ? "Conteggi nascosti per privacy (pochi superstiti) fino al calcio d'inizio." : "Giornata visibile: ecco le scelte di tutti i partecipanti."}</span>
+            </div>
             {(summary.fixtures || []).map((f, i) => (
-              <div key={i} className="rounded-lg bg-[#0F1216] p-3">
-                <div className="text-sm font-medium">{f.home_team} - {f.away_team}</div>
-                <div className="flex gap-3 mt-1 text-xs text-[#94A3B8]">
-                  <span>1: <b className="text-white">{f.counts?.["1"] ?? 0}</b></span>
-                  <span>X: <b className="text-white">{f.counts?.["X"] ?? 0}</b></span>
-                  <span>2: <b className="text-white">{f.counts?.["2"] ?? 0}</b></span>
+              <div key={i} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold flex-1 truncate">{f.home_team}</span>
+                  <span className="text-xs text-[#94A3B8]">vs</span>
+                  <span className="font-extrabold flex-1 text-right truncate">{f.away_team}</span>
+                </div>
+                <div className="flex gap-2">
+                  {["1", "X", "2"].map((s) => (
+                    <div key={s} className="flex-1 rounded-lg bg-[#0F1216] border border-white/10 py-1.5 text-center">
+                      <div className="text-[11px] text-[#94A3B8]">{s}</div>
+                      <div className="font-extrabold text-[#F59E0B]">{f.counts?.[s] ?? 0}</div>
+                    </div>
+                  ))}
                 </div>
                 {Array.isArray(f.picks) && f.picks.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
                     {f.picks.map((p, j) => (
-                      <span key={j} className={`text-xs px-2 py-0.5 rounded ${p.correct === true ? "bg-[#00D95F]/20 text-[#00D95F]" : p.correct === false ? "bg-[#EF4444]/20 text-[#EF4444]" : "bg-white/10"}`}>{p.nickname}: {p.pick}</span>
+                      <span key={j} className={`text-[11px] px-2 py-0.5 rounded-full border ${p.correct === true ? "bg-[#00D95F]/15 border-[#00D95F]/40 text-[#00D95F]" : p.correct === false ? "bg-[#EF4444]/15 border-[#EF4444]/40 text-[#EF4444]" : "bg-white/5 border-white/10 text-[#94A3B8]"}`}>{p.nickname}: <b>{p.pick}</b></span>
                     ))}
                   </div>
                 )}

@@ -1,0 +1,25 @@
+{
+  "summary": "Verified frontend fixes for 4 regressions (TIKET classifica, TIKET breakdown, BONUS storico, Survival/SAL riepilogo). All 4 items PASS. Backend not tested per request.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ScoreAndLive detail (any) / dropdown option", "issues": ["Console warning: 'In HTML, <span> cannot be a child of <option>. This will cause a hydration error.' Non-blocking but should be cleaned up in SAL detail dropdowns (--- nessun marcatore ---)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "React hydration warning: SAL detail renders <span> inside <option>. Ref browser console at /scoreandlive/<id>. Non-blocking but violates HTML spec.",
+    "TiketRoom and Bonus use Tailwind arbitrary color values (bg-[#00D95F]/10, text-[#EF4444]) instead of tokens; fine but consider centralizing color tokens for consistency."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100% (5/5 checks)"},
+  "test_credentials": "Admin e1qa.admin@gmail.com/Test1234! (login placeholder 'Email o Nickname'; submit button text 'Accedi' — NOT type=submit)",
+  "seed_data_creation": "None. Read-only verification on production data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: fill input[placeholder*='Email'] with email/nickname, fill input[type=password], then click 'button:has-text(\"Accedi\")' with force=True. TIKET room 7e22e4b6-4cd6-4305-8d36-b2ad02732f4a has G1 leaderboard with 4 rows (tkr-row-*); clicking a row toggles tkr-breakdown-<uid> containing tkr-event-<uid>-<idx> whose OUTER container carries green (border-[#00D95F]/40 bg-[#00D95F]/10) / red (#EF4444) / neutral (border-white/10) classes — NOT text-green/text-red — so class-substring checks must include the arbitrary hex values or SVG lucide-circle-check/circle-x classes. BONUS /bonus tabs: 'Tiket' and 'Survival' both render [data-testid=\"bonus-history-1\"] with picks [data-testid^=\"bonus-history-pick-1-\"]; correctness icons are lucide-circle-check (text-[#00D95F]) or lucide-circle-x (text-[#EF4444]). VERIFIED: Tiket-tab prova3 pick '2-0' is GREEN (result 2-0); Survival-tab prova3 pick '3-1' is RED (result 2-0). SURVIVAL detail button 'Mostra riepilogo giornata N' toggles a summary showing 'Giornata visibile: ...' banner + per-match card with 1/X/2 counts. SAL detail button 'Mostra riassunto G<N>' shows privacy banner 'Le scelte individuali sono nascoste ...' + per-match cards 'Home vs Away' with 'N pronostici totali'. Survival and SAL card lists use [data-testid^=\"sv-card-\"] and [data-testid^=\"sal-card-\"], NOT <a href>.",
+  "rca of the issue": "Regressions were 4 frontend-only bugs already fixed by main agent. Confirmed: (#1) board.leaderboard read path works, (#2) riepilogo layouts (Survival + SAL) render clean cards + privacy banner, (#3) breakdown expand/collapse toggles with colored event borders, (#4) Bonus /bonus renders bonus-history-1 with picks and correctness icons on both Tiket & Survival tabs."
+}

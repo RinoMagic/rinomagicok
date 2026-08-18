@@ -3,6 +3,15 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Fix — Ripristino 4 funzioni dall'originale GitHub (2026-06)
+Recuperato il repo originale RinoMagic/RinoMagic (backend Python IDENTICO al nostro → problemi tutti frontend). Corretti 4 punti:
+1. **Calcolo Betting** (`TiketRoom.js`): la classifica leggeva `board.entries` invece di `board.leaderboard` → mostrava sempre "in attesa". Ora mostra le righe con punteggio/trofeo/birra.
+2. **Riepilogo giornata** (`SurvivalDetail.js`, `ScoreAndLiveDetail.js`): layout ripulito come l'originale — intestazione "Riassunto Giornata", avviso privacy/stato, card per partita (conteggi 1/X/2 o candidati marcatore + chip nickname).
+3. **Giocate singole dalla classifica** (`TiketRoom.js`): ogni riga classifica è cliccabile ed espande la schedina del giocatore (breakdown) con esito verde/rosso 'PERSA'/grigio 'RINV.'.
+4. **Sezione bonus G1** (`Bonus.js`): il bonus liquidato spariva (`/bonus/available` filtra `settled_at=None`). Aggiunte sezioni "Pronostici Giornata" (`/bonus/current-locked-picks`) e "Storico bonus" (`/bonus/history/full`) che mostrano tutte le giocate con chi ha vinto/perso.
+Verified: testing agent iteration_11 frontend 5/5 (100%). Backend non modificato.
+
+
 ## Feature — Archivia Torneo/Stanza/Lega (2026-06)
 - L'admin può ARCHIVIARE (invece di eliminare) un elemento CONCLUSO: lo storico resta consultabile ma esce dalla lista attiva → sezione collassabile "Archiviati" (Ripristina + Elimina). Solo admin.
 - Backend: campo `archived` nei dict + endpoint `POST /archive?archived=bool` per ogni gioco. Gate "concluso": Survival/SAL `status=='finished'`, Tiket `status=='settled'`, Fanta `current_matchday!=null`. Unarchive sempre consentito. (`surviva.py`, `scoreandlive.py`, `thebesttiket.py`, `fantagiornata.py`).

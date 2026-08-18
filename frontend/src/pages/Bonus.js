@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Gift, Target, Goal } from "lucide-react";
+import { ChevronLeft, Gift, Target, Goal, CheckCircle2, XCircle, History } from "lucide-react";
 import { api } from "@/lib/api";
 
 const SEASON = "2026-27";
@@ -16,14 +16,20 @@ export default function Bonus() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("survival");
   const [data, setData] = useState(null);
+  const [locked, setLocked] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inputs, setInputs] = useState({}); // subId -> {home,away} or {player}
 
   const active = TABS.find((t) => t.game === tab);
 
   const load = useCallback(async () => {
-    setLoading(true); setData(null);
-    try { setData(await api(`/bonus/available?game=${tab}&season=${SEASON}`)); }
+    setLoading(true); setData(null); setLocked(null); setHistory([]);
+    try {
+      setData(await api(`/bonus/available?game=${tab}&season=${SEASON}`));
+      setLocked(await api(`/bonus/current-locked-picks?game=${tab}&season=${SEASON}`).catch(() => null));
+      setHistory(await api(`/bonus/history/full?game=${tab}&season=${SEASON}`).catch(() => []));
+    }
     catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
   }, [tab]);
@@ -44,6 +50,22 @@ export default function Bonus() {
   };
 
   const setIn = (id, patch) => setInputs((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
+
+  const fmtPick = (pick) => {
+    if (pick == null) return "—";
+    if (typeof pick === "string" || typeof pick === "number") return String(pick);
+    if (pick.home_score != null && pick.away_score != null) return `${pick.home_score}-${pick.away_score}`;
+    if (pick.player_name) return pick.player_name;
+    if (pick.pick) return fmtPick(pick.pick);
+    return JSON.stringify(pick);
+  };
+  const fmtResult = (r) => {
+    if (r == null) return null;
+    if (typeof r === "string") return r;
+    if (r.home_score != null && r.away_score != null) return `${r.home_score}-${r.away_score}`;
+    if (r.player_name) return r.player_name;
+    return JSON.stringify(r);
+  };
 
   const cfg = data?.config;
   const subs = data?.subscriptions || [];
@@ -101,6 +123,52 @@ export default function Bonus() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pronostici della giornata corrente (visibili dopo la deadline) */}
+      {locked?.visible && (locked.picks || []).length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-extrabold flex items-center gap-2"><Target size={18} className="text-[#F59E0B]" /> Pronostici Giornata {locked.matchday}{locked.settled ? " · Liquidato" : ""}</h2>
+          {locked.big_match && <div className="text-sm text-[#94A3B8]">{locked.big_match.home_team} - {locked.big_match.away_team}{fmtResult(locked.result) ? ` · Risultato: ${fmtResult(locked.result)}` : ""}</div>}
+          <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+            {locked.picks.map((p, i) => (
+              <div key={i} data-testid={`bonus-locked-pick-${i}`} className="px-4 py-2.5 flex items-center gap-3 text-sm">
+                <span className="flex-1 min-w-0 truncate"><b>{p.nickname}</b> <span className="text-[#64748B]">· {p.subscription_name}</span></span>
+                <span className="text-[#F59E0B] font-bold">{fmtPick(p.pick)}</span>
+                {locked.settled && (p.is_correct ? <CheckCircle2 size={16} className="text-[#00D95F]" /> : <XCircle size={16} className="text-[#EF4444]" />)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Storico bonus liquidati con vincitori/perdenti */}
+      {history.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-extrabold flex items-center gap-2"><History size={18} className="text-[#94A3B8]" /> Storico bonus</h2>
+          {history.map((h, hi) => {
+            const winners = (h.picks || []).filter((p) => p.is_correct).length;
+            return (
+              <div key={hi} data-testid={`bonus-history-${h.matchday}`} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold">Giornata {h.matchday}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#00D95F]/15 text-[#00D95F]">{winners} vincitori</span>
+                </div>
+                {h.big_match && <div className="text-sm text-[#94A3B8]">{h.big_match.home_team} - {h.big_match.away_team}{fmtResult(h.result) ? ` · Risultato: ${fmtResult(h.result)}` : ""}</div>}
+                <div className="rounded-lg bg-[#0F1216] border border-white/10 divide-y divide-white/5">
+                  {(h.picks || []).length === 0 && <div className="px-3 py-2 text-xs text-[#64748B]">Nessuna giocata.</div>}
+                  {(h.picks || []).map((p, pi) => (
+                    <div key={pi} data-testid={`bonus-history-pick-${h.matchday}-${pi}`} className="px-3 py-2 flex items-center gap-3 text-sm">
+                      <span className="flex-1 min-w-0 truncate"><b>{p.nickname}</b> <span className="text-[#64748B]">· {p.subscription_name}</span></span>
+                      <span className="text-[#F59E0B] font-bold">{fmtPick(p.pick)}</span>
+                      {p.is_correct ? <CheckCircle2 size={16} className="text-[#00D95F]" /> : <XCircle size={16} className="text-[#EF4444]" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

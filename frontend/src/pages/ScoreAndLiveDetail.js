@@ -169,25 +169,42 @@ export default function ScoreAndLiveDetail() {
       </div>
 
       <div>
-        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><BarChart3 size={18} className="text-[#3B82F6]" /> Riepilogo giornata</h2>
-        <button data-testid="sald-summary-btn" onClick={loadSummary} className="w-full text-sm font-bold text-[#3B82F6] border border-[#3B82F6]/30 rounded-md py-2 mb-2">Mostra riepilogo giornata corrente</button>
-        <button data-testid="sald-export-pdf" onClick={exportPdf} className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[#00D95F] border border-[#00D95F]/30 rounded-md py-2 mb-2"><FileDown size={16} /> Esporta PDF</button>
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><BarChart3 size={18} className="text-[#3B82F6]" /> Riassunto Giornata</h2>
+        <div className="flex gap-2 mb-2">
+          <button data-testid="sald-summary-btn" onClick={loadSummary} className="flex-1 text-sm font-bold text-[#3B82F6] border border-[#3B82F6]/30 rounded-md py-2">Mostra riassunto{md ? ` G${md.matchday_number}` : ""}</button>
+          <button data-testid="sald-export-pdf" onClick={exportPdf} className="flex items-center justify-center gap-1.5 text-sm font-bold text-[#00D95F] border border-[#00D95F]/30 rounded-md px-3 py-2"><FileDown size={16} /> PDF</button>
+        </div>
         {summary && (
-          <div className="mt-3 space-y-2">
+          <div className="space-y-3">
+            <div className={`rounded-lg border p-3 flex items-start gap-2 text-xs ${summary.locked || summary.settled ? "border-[#3B82F6]/40 bg-[#3B82F6]/5 text-[#93C5FD]" : "border-white/10 bg-[#181D22] text-[#94A3B8]"}`}>
+              <BarChart3 size={15} className="shrink-0 mt-0.5" />
+              <span>{summary.locked || summary.settled ? "Giornata iniziata: puoi vedere le scelte di tutti i partecipanti." : "Le scelte individuali sono nascoste fino al calcio d'inizio della prima partita. Solo conteggi aggregati."}</span>
+            </div>
+            {(summary.fixtures || []).length === 0 && <div className="text-sm text-[#64748B] italic">Nessuna partita in questa giornata.</div>}
             {(summary.fixtures || []).map((f, i) => (
-              <div key={i} className="rounded-lg bg-[#0F1216] p-3">
-                <div className="text-sm font-medium">{f.home_team} - {f.away_team}</div>
+              <div key={i} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold flex-1 truncate">{f.home_team}</span>
+                  <span className="text-xs text-[#94A3B8]">vs</span>
+                  <span className="font-extrabold flex-1 text-right truncate">{f.away_team}</span>
+                </div>
+                <div className="text-xs text-[#94A3B8]">{f.total_picks ?? (f.candidates || []).reduce((a, c) => a + (c.count || 0), 0)} pronostici totali</div>
                 {(f.candidates || []).length === 0 ? (
-                  <div className="text-xs text-[#64748B] mt-1">Nessun marcatore scelto (o nascosto per privacy).</div>
+                  <div className="text-xs text-[#64748B] italic">Nessun pronostico su questa partita.</div>
                 ) : (
-                  <div className="mt-1 space-y-1">
+                  <div className="space-y-1.5">
                     {f.candidates.map((c, j) => (
-                      <div key={j} className="text-xs flex items-center gap-2">
-                        <span className="text-white">{c.player_name}</span>
-                        <span className="text-[#94A3B8]">×{c.count}</span>
-                        {Array.isArray(c.pickers) && c.pickers.length > 0 && (
-                          <span className="text-[#64748B]">— {c.pickers.map((p) => p.nickname).join(", ")}</span>
-                        )}
+                      <div key={j} className="rounded-lg bg-[#0F1216] border border-white/10 p-2.5 flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold">{c.player_name}</div>
+                          {c.team && <div className="text-[11px] text-[#64748B]">{c.team}</div>}
+                          {Array.isArray(c.pickers) && c.pickers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {c.pickers.map((p, k) => <span key={k} className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{p.nickname}</span>)}
+                            </div>
+                          )}
+                        </div>
+                        <span className="shrink-0 min-w-8 text-center px-2.5 py-1 rounded-full bg-[#3B82F6]/15 text-[#3B82F6] font-extrabold">{c.count}</span>
                       </div>
                     ))}
                   </div>
