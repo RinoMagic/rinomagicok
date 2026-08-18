@@ -3,6 +3,12 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Migliorie — Anteprima default + velocità dettaglio Survival (2026-06)
+- **Anteprima default**: `GET /sv/.../participants/{uid}/picks` ora, per una giornata con deadline SCADUTA ma NON ancora calcolata, inietta le giocate di default in anteprima (`preview:true`, `auto_generated:true`, non persistite) — visibili come le altre solo dopo la scadenza. Al calcolo diventano picks reali. Modal mostra badge AUTO + icona orologio.
+- **Velocità**: l'endpoint caricava le deadline con 38 query sequenziali; ora una singola query batch (`dl_map` + `_parse_stored`) → apertura dettaglio da ~8s a ~1s.
+- Nota: giocata di default su partita SOSPESA (senza risultato) conserva la vita (corretto, non è un bug — confermato dall'utente).
+- Verified: testing agent iteration_12, backend 100% (1.07s), frontend 5/5.
+
 ## Nota — Giocata di default Survival (auto-pick) (2026-06)
 - La funzione ERA già presente e attiva nel backend (`surviva.py::_auto_fill_default_picks`, chiamata a STEP 0 di `POST /sv/.../settle`, invocata anche dal flusso admin unificato `matchday_settle`). Al momento della liquidazione, ai giocatori che non hanno inviato la giocata vengono assegnati pronostici di default: prima partita utile a scendere, segno "1" (o "2" se casa bloccata, "X" se entrambe bloccate). Verificato sui dati reali (e1qa.admin/prova1/veroneandrea055 hanno preso picks `auto_generated` in G1).
 - Frontend: aggiunta etichetta **AUTO** ai pick auto-generati nel `SurvivaPicksModal` per renderli riconoscibili. Nessuna modifica al backend.

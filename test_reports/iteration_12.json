@@ -1,0 +1,16 @@
+{
+  "summary": "Verified 2 Survival fixes (VELOCITÀ picks-detail + ANTEPRIMA DEFAULT before settlement) and 3 regressions (calcolata rendering, leaderboard badges, modal close). All checks PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (endpoint 1.07s vs 8s baseline)", "frontend": "100% (5/5 checks)"},
+  "test_credentials": "Admin e1qa.admin@gmail.com / Test1234! (login by email; button 'Accedi')",
+  "seed_data_creation": "None (read-only navigation on production tournament d28645bf-440e-4bb5-aedf-6fab9197ebc6)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "GET /api/sv/tournaments/{tid}/participants/{uid}/picks returns {participant, matchdays[]}. Each matchday has settled, deadline_passed, hidden, picks[]. For G2 (deadline_passed && !settled) the endpoint injects preview picks with auto_generated:true + preview:true (NOT persisted). Frontend SurvivaPicksModal renders 'AUTO' badge next to teams for p.auto_generated, and clock icon (orologio) when outcome is 'na' (correct===null && !settled OR settled but no result -> suspended). G1 shows 3 rows all AUTO (persisted, preview null): Atalanta-Sassuolo=clock (suspended, life kept), Bologna-Lazio & Genoa-Napoli=red heart (correct=false). G2 shows Atalanta-Bologna AUTO 1 + clock. G3+ not visible. Modal opens ~1.3s end-to-end (row click -> md blocks present). sv-modal-close X button closes modal. Login flow: input[placeholder*='Email']+input[type='password']+button:has-text('Accedi') force=True. Navigate to /survival/<tid> and wait ~4s for leaderboard rows (initial 'Caricamento...' spinner).",
+  "rca of the issue": "N/A - fixes verified working. Backend batch-load of deadlines (_dl_map single query) drops response from ~8s to ~1s. _preview_defaults(md, existing) generates unpersisted AUTO picks (preview:true) for deadline_passed && !settled matchdays; frontend renders these identically to persisted picks with the AUTO badge and pending outcome icon."
+}

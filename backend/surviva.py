@@ -33,7 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from bonus import ensure_bonus_draft
-from deadlines import is_matchday_locked as _global_deadline_passed
+from deadlines import is_matchday_locked as _global_deadline_passed, _parse_stored
 
 logger = logging.getLogger("surviva")
 
@@ -928,11 +928,57 @@ def build_router(
         ):
             picks_by_md.setdefault(pk["matchday_id"], []).append(pk)
 
+        # Batch-load ALL deadlines for the season once (avoids 38 sequential
+        # DB round-trips → the picks modal now opens instantly).
+        dl_map: Dict[int, Any] = {}
+        async for d in db.matchday_deadlines.find(
+            {"season": season}, {"_id": 0, "matchday": 1, "deadline_at": 1},
+        ):
+            parsed = _parse_stored(d.get("deadline_at"))
+            if parsed is not None:
+                dl_map[int(d["matchday"])] = parsed
+        now_dt = datetime.now(timezone.utc)
+
+        target_lives = int(target.get("lives_left") or 0)
+        target_locks = set(target.get("locked_teams") or [])
+
+        def _preview_defaults(md: dict, existing: List[dict]) -> List[dict]:
+            """Compute (non-persisted) default picks for display AFTER the
+            deadline but BEFORE settlement — same rule as the settle-time
+            auto-fill: first fixture first, sign respecting team blocks."""
+            required = max(0, target_lives)
+            needed = required - len(existing)
+            if needed <= 0:
+                return []
+            picked_keys = {(pk.get("home_team"), pk.get("away_team")) for pk in existing}
+            out_p: List[dict] = []
+            for fx in md.get("fixtures", []):
+                if needed <= 0:
+                    break
+                key = (fx.get("home_team"), fx.get("away_team"))
+                if key in picked_keys or fx.get("excluded") or fx.get("postponed_before"):
+                    continue
+                home, away = fx.get("home_team"), fx.get("away_team")
+                if home not in target_locks:
+                    sign, conc = "1", False
+                elif away not in target_locks:
+                    sign, conc = "2", False
+                else:
+                    sign, conc = "X", True
+                out_p.append({
+                    "home_team": home, "away_team": away, "pick": sign,
+                    "concession": conc, "correct": None,
+                    "auto_generated": True, "preview": True,
+                })
+                needed -= 1
+            return out_p
+
         out: List[dict] = []
         for md in matchdays:
             md_num = md["matchday"]
             settled = md.get("status") == "settled"
-            deadline_passed = await _global_deadline_passed(db, season, md_num)
+            dl = dl_map.get(md_num)
+            deadline_passed = dl is not None and now_dt >= dl
             visible = is_self or settled or deadline_passed
             entry: Dict[str, Any] = {
                 "matchday": md_num,
@@ -941,16 +987,18 @@ def build_router(
                 "settled": settled,
                 "deadline_passed": deadline_passed,
                 "hidden": not visible,
-                # Whether THIS participant nailed the Big Match exact score
-                # for this matchday and received +1 life. Surfaced to the
-                # picks modal so the UI can show a "🎁" icon next to the
-                # Giornata title. Only visible on settled matchdays.
                 "big_match_bonus_won": bool(
                     settled and user_id in (md.get("big_match_bonus_users") or [])
                 ),
             }
             if visible:
-                entry["picks"] = picks_by_md.get(md["id"], [])
+                existing = picks_by_md.get(md["id"], [])
+                # After the deadline and before settlement, surface the
+                # default picks the player WILL receive at calcolo, so the
+                # giocata is visible like everyone else's (marked preview).
+                if not settled and deadline_passed and target.get("eliminated_at") is None:
+                    existing = existing + _preview_defaults(md, existing)
+                entry["picks"] = existing
             out.append(entry)
 
         # Snapshot participant state (lives, locked teams, elimination)
