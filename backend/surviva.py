@@ -996,6 +996,14 @@ def build_router(
             }
             if visible:
                 existing = picks_by_md.get(md["id"], [])
+                # Vite a inizio giornata (cuoricini nel riepilogo): per una
+                # giornata calcolata equivale al numero di giocate persistite
+                # (le picks vengono auto-completate = vite a inizio giornata);
+                # per la giornata corrente sono le vite attuali del giocatore.
+                if settled:
+                    entry["lives_at_start"] = len(existing)
+                else:
+                    entry["lives_at_start"] = max(0, target_lives)
                 # After the deadline and before settlement, surface the
                 # default picks the player WILL receive at calcolo, so the
                 # giocata is visible like everyone else's (marked preview).

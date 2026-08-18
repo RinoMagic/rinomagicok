@@ -2219,8 +2219,23 @@ def build_router(
     @router.get("/rooms/{room_id}/leaderboard")
     async def leaderboard(room_id: str, user: dict = Depends(current_user)):
         await _ensure_member(room_id, user)
+        room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
         fixtures = [f async for f in db.fixtures.find({"room_id": room_id}, {"_id": 0})]
         has_results = len(fixtures) > 0
+
+        # Excluded matches for this room's matchday are neutralised (quota
+        # 1.00): read them from the season calendar so the rule survives even
+        # if per-room results are re-imported.
+        excluded_fixtures = []
+        if room:
+            season = room.get("season") or "2026-27"
+            room_md = room.get("matchday")
+            if room_md is not None:
+                async for cf in db.sal_calendar.find(
+                    {"season": season, "matchday": room_md, "excluded": True},
+                    {"_id": 0, "home_team": 1, "away_team": 1},
+                ):
+                    excluded_fixtures.append(cf)
 
         schedine_cur = db.schedine.find(
             {"room_id": room_id, "status": "confirmed"}, {"_id": 0},
@@ -2242,7 +2257,16 @@ def build_router(
                     "matched_fixture": None,
                     "score": None,
                 }
-                if has_results:
+                excl = _match_prediction_to_fixture(e, excluded_fixtures) if excluded_fixtures else None
+                if excl:
+                    # Excluded match → neutral quota 1.00 (auto-won, no gain).
+                    info["won"] = True
+                    info["postponed"] = True
+                    info["matched_fixture"] = f"{excl['home_team']} vs {excl['away_team']}"
+                    info["score"] = "ESCL."
+                    product *= 1.0
+                    won_count += 1
+                elif has_results:
                     fx = _match_prediction_to_fixture(e, fixtures)
                     if fx:
                         info["matched_fixture"] = f"{fx['home_team']} vs {fx['away_team']}"

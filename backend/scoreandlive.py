@@ -1596,18 +1596,102 @@ def build_router(
         r = await db.sal_calendar.delete_many({"season": season})
         return {"season": season, "deleted": r.deleted_count}
 
+    async def _propagate_fixture_exclusion(home, away, matchday, excluded: bool) -> dict:
+        """Mark/unmark a fixture as excluded across every NON-settled snapshot
+        of ``matchday`` in all games, so a removed/excluded match can never be
+        played again. Matching is whitespace/case-insensitive.
+
+        * Survival (``sv_matchdays``) & ScoreAndLive (``sal_matchdays``):
+          set ``excluded`` + ``postponed_before`` on the fixture → hidden from
+          the playable list and rejected on submit.
+        * TheBestTiket rooms: inject a neutral ``postponed=True`` result
+          (quota 1.00) into ``db.fixtures`` for every open room of the
+          matchday, so the excluded match never gains/loses points on the
+          schedina — even after the calendar row is deleted.
+        """
+        h = (home or "").strip().lower()
+        a = (away or "").strip().lower()
+        counts = {"sv": 0, "sal": 0, "tiket": 0}
+
+        def _same(f):
+            return (f.get("home_team") or "").strip().lower() == h and \
+                   (f.get("away_team") or "").strip().lower() == a
+
+        async for md in db.sv_matchdays.find(
+            {"matchday": matchday, "status": {"$ne": "settled"}},
+        ):
+            changed = False
+            for f in md.get("fixtures", []):
+                if _same(f):
+                    f["excluded"] = excluded
+                    f["postponed_before"] = excluded
+                    changed = True
+            if changed:
+                await db.sv_matchdays.update_one(
+                    {"_id": md["_id"]}, {"$set": {"fixtures": md["fixtures"]}},
+                )
+                counts["sv"] += 1
+
+        async for md in db.sal_matchdays.find(
+            {"matchday_number": matchday, "status": {"$ne": "settled"}},
+        ):
+            changed = False
+            for f in md.get("fixtures", []):
+                if _same(f):
+                    f["excluded"] = excluded
+                    f["postponed_before"] = excluded
+                    changed = True
+            if changed:
+                await db.sal_matchdays.update_one(
+                    {"_id": md["_id"]}, {"$set": {"fixtures": md["fixtures"]}},
+                )
+                counts["sal"] += 1
+
+        async for room in db.rooms.find(
+            {"matchday": matchday, "game": "thebesttiket",
+             "status": {"$ne": "settled"}},
+            {"_id": 0, "id": 1},
+        ):
+            if excluded:
+                await db.fixtures.update_one(
+                    {"room_id": room["id"], "home_team": home, "away_team": away},
+                    {"$set": {
+                        "room_id": room["id"],
+                        "home_team": home,
+                        "away_team": away,
+                        "home_score": 0,
+                        "away_score": 0,
+                        "both_scored": False,
+                        "postponed": True,
+                        "excluded": True,
+                    }},
+                    upsert=True,
+                )
+            else:
+                await db.fixtures.delete_one({
+                    "room_id": room["id"], "home_team": home,
+                    "away_team": away, "excluded": True,
+                })
+            counts["tiket"] += 1
+        return counts
+
     @router.delete("/calendar/fixture/{fixture_id}")
     async def delete_calendar_fixture(fixture_id: str, user: dict = Depends(require_admin)):
         """Delete a single fixture from the season calendar.
 
-        Used by admins to remove a postponed / cancelled match. Does NOT
-        affect matchdays already created inside tournaments — those keep
-        their own copy of the fixture snapshot.
+        The removal is PROPAGATED to every NON-settled snapshot of that
+        matchday in all games (Survival, ScoreAndLive, TheBestTiket) so the
+        deleted match instantly disappears from the playable fixtures and is
+        neutralised (quota 1.00) on Tiket schedine.
         """
-        r = await db.sal_calendar.delete_one({"id": fixture_id})
-        if r.deleted_count == 0:
+        fx = await db.sal_calendar.find_one({"id": fixture_id}, {"_id": 0})
+        if not fx:
             raise HTTPException(status_code=404, detail="Partita non trovata")
-        return {"deleted": True}
+        propagated = await _propagate_fixture_exclusion(
+            fx.get("home_team"), fx.get("away_team"), fx.get("matchday"), True,
+        )
+        await db.sal_calendar.delete_one({"id": fixture_id})
+        return {"deleted": True, "propagated": propagated}
 
     @router.put("/calendar/fixture/{fixture_id}")
     async def update_calendar_fixture(
@@ -1658,62 +1742,9 @@ def build_router(
         )
         if not fx:
             raise HTTPException(status_code=404, detail="Partita non trovata")
-        # Propagate to open snapshots — Survival, Score and Tiket store
-        # a copy of the fixture arrays inside their per-matchday/per-room
-        # documents. Update anywhere the home/away pair matches.
-        home = fx["home_team"]
-        away = fx["away_team"]
-        season = fx.get("season")
-        md = fx.get("matchday")
-        propagated = {"sv": 0, "sal": 0, "tiket": 0}
-        try:
-            r = await db.sv_matchdays.update_many(
-                {
-                    "matchday": md,
-                    "status": {"$ne": "settled"},
-                    "fixtures.home_team": home,
-                    "fixtures.away_team": away,
-                },
-                {"$set": {
-                    "fixtures.$[e].excluded": excluded,
-                    "fixtures.$[e].postponed_before": excluded,
-                }},
-                array_filters=[{"e.home_team": home, "e.away_team": away}],
-            )
-            propagated["sv"] = r.modified_count
-        except Exception:
-            pass
-        try:
-            r = await db.sal_matchdays.update_many(
-                {
-                    "matchday_number": md,
-                    "status": {"$ne": "settled"},
-                    "fixtures.home_team": home,
-                    "fixtures.away_team": away,
-                },
-                {"$set": {
-                    "fixtures.$[e].excluded": excluded,
-                    "fixtures.$[e].postponed_before": excluded,
-                }},
-                array_filters=[{"e.home_team": home, "e.away_team": away}],
-            )
-            propagated["sal"] = r.modified_count
-        except Exception:
-            pass
-        try:
-            r = await db.rooms.update_many(
-                {
-                    "matchday": md,
-                    "status": {"$ne": "settled"},
-                    "fixtures.home_team": home,
-                    "fixtures.away_team": away,
-                },
-                {"$set": {"fixtures.$[e].excluded": excluded}},
-                array_filters=[{"e.home_team": home, "e.away_team": away}],
-            )
-            propagated["tiket"] = r.modified_count
-        except Exception:
-            pass
+        propagated = await _propagate_fixture_exclusion(
+            fx["home_team"], fx["away_team"], fx.get("matchday"), excluded,
+        )
         return {"fixture": fx, "excluded": excluded, "propagated": propagated}
 
 

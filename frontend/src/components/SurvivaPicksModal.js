@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Gift, EyeOff, CheckCircle2, Clock, HeartCrack } from "lucide-react";
+import { X, Gift, EyeOff, CheckCircle2, Clock, HeartCrack, Heart } from "lucide-react";
 import { api } from "@/lib/api";
 
 // Dettaglio giocate di un partecipante Survival, raggruppate per giornata.
@@ -47,6 +47,24 @@ export function SurvivaPicksModal({ tid, row, onClose }) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm">Giornata {md.matchday}</span>
+                  {typeof md.lives_at_start === "number" && (
+                    <span
+                      data-testid={`sv-modal-lives-${md.matchday}`}
+                      title={`Vite a inizio giornata: ${md.lives_at_start}`}
+                      className="inline-flex items-center gap-0.5"
+                    >
+                      {md.lives_at_start > 0 ? (
+                        Array.from({ length: Math.min(md.lives_at_start, 6) }).map((_, hi) => (
+                          <Heart key={hi} size={13} className="text-[#EF4444] fill-[#EF4444]" />
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-[#94A3B8] font-bold">0 vite</span>
+                      )}
+                      {md.lives_at_start > 6 && (
+                        <span className="text-[10px] text-[#EF4444] font-bold ml-0.5">+{md.lives_at_start - 6}</span>
+                      )}
+                    </span>
+                  )}
                   {md.big_match_bonus_won && (
                     <span title="Big Match Bonus: +1 vita" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#F59E0B]/15 border border-[#F59E0B]"><Gift size={12} className="text-[#F59E0B]" /></span>
                   )}
