@@ -239,62 +239,66 @@ async def set_reminders(body: RemindersIn, user: dict = Depends(require_admin)):
 
 @app.on_event("startup")
 async def startup():
-    # User-level indexes (owned by the auth module conceptually, but they
-    # sit in the same collection touched by every game, so we create them
-    # up-front here to keep the seed idempotent).
-    # NOTE: the production Atlas DB may already contain equivalent indexes
-    # with slightly different options (e.g. sparse vs partial). Creating them
-    # is best-effort so we never crash startup on an IndexKeySpecsConflict.
-    async def _safe_index(coll, *args, **kwargs):
+    # IMPORTANT (fix 404/502 at login on deploy/restart): index creation +
+    # backfills against Atlas take ~15-18s and MUST NOT block the app from
+    # accepting requests. We therefore schedule ALL of it in a BACKGROUND
+    # task so `/api/auth/login` (and every route) is served immediately on
+    # startup. The prod DB already has the admin + indexes, so nothing here
+    # is required before the first request.
+    import asyncio
+
+    async def _bootstrap():
+        # User-level indexes (best-effort — prod Atlas may already have
+        # equivalent indexes with different options; never crash on conflict).
+        async def _safe_index(coll, *args, **kwargs):
+            try:
+                await coll.create_index(*args, **kwargs)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("skip index on %s: %s", coll.name, exc)
+
+        await _safe_index(db.users, "id", unique=True)
+        await _safe_index(
+            db.users, "email", unique=True,
+            partialFilterExpression={"email": {"$type": "string"}},
+        )
+        await _safe_index(
+            db.users, "username", unique=True,
+            partialFilterExpression={"username": {"$type": "string"}},
+        )
+        await _safe_index(db.reset_tokens, "token", unique=True)
+        await _safe_index(db.reset_tokens, "expires_at", expireAfterSeconds=0)
+
+        async def _safe(coro_fn, *a, label=""):
+            try:
+                await coro_fn(*a)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("startup step %s skipped: %s", label or coro_fn, exc)
+
+        await _safe(_tbt_ensure_indexes, db, label="tbt_idx")
+        await _safe(_tbt_backfill, db, label="tbt_backfill")
+        await _safe(_sal_ensure_indexes, db, label="sal_idx")
+        await _safe(_facts_ensure_indexes, db, label="facts_idx")
+        await _safe(_fg_ensure_indexes, db, label="fg_idx")
+        await _safe(_sv_ensure_indexes, db, label="sv_idx")
+        await _safe(_bonus_ensure_indexes, db, label="bonus_idx")
+        await _safe(_deadlines_ensure_indexes, db, label="deadlines_idx")
         try:
-            await coll.create_index(*args, **kwargs)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("skip index on %s: %s", coll.name, exc)
+            stats = await _deadlines_backfill(db)
+            if stats["copied"]:
+                logger.info("deadlines backfill: %s", stats)
+        except Exception:
+            logger.exception("deadlines backfill failed")
 
-    await _safe_index(db.users, "id", unique=True)
-    await _safe_index(
-        db.users, "email", unique=True,
-        partialFilterExpression={"email": {"$type": "string"}},
-    )
-    await _safe_index(
-        db.users, "username", unique=True,
-        partialFilterExpression={"username": {"$type": "string"}},
-    )
-    await _safe_index(db.reset_tokens, "token", unique=True)
-    await _safe_index(db.reset_tokens, "expires_at", expireAfterSeconds=0)
+        await seed_admin_if_missing(db)
+        logger.info("RinoMagic bootstrap (indexes + seed) complete")
 
-    # Per-game indexes + backfills (best-effort — existing prod indexes may
-    # differ in options; never crash startup on a conflict).
-    async def _safe(coro_fn, *a, label=""):
-        try:
-            await coro_fn(*a)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("startup step %s skipped: %s", label or coro_fn, exc)
-
-    await _safe(_tbt_ensure_indexes, db, label="tbt_idx")
-    await _safe(_tbt_backfill, db, label="tbt_backfill")
-    await _safe(_sal_ensure_indexes, db, label="sal_idx")
-    await _safe(_facts_ensure_indexes, db, label="facts_idx")
-    await _safe(_fg_ensure_indexes, db, label="fg_idx")
-    await _safe(_sv_ensure_indexes, db, label="sv_idx")
-    await _safe(_bonus_ensure_indexes, db, label="bonus_idx")
-
-    # Global deadlines: indexes + one-shot backfill from legacy per-room fields
-    await _safe(_deadlines_ensure_indexes, db, label="deadlines_idx")
-    try:
-        stats = await _deadlines_backfill(db)
-        if stats["copied"]:
-            logger.info("deadlines backfill: %s", stats)
-    except Exception:
-        logger.exception("deadlines backfill failed")
-
-    await seed_admin_if_missing(db)
+    app.state.bootstrap_task = asyncio.create_task(_bootstrap())
 
     # Automatic notifications: background loop that notifies participants when a
     # new matchday opens and reminds them when the deadline is near.
-    import asyncio
-
     async def _auto_notify_loop():
+        # Give the bootstrap a head start; not required for correctness.
+        await asyncio.sleep(15)
         while True:
             try:
                 now = datetime.now(timezone.utc)
@@ -351,9 +355,10 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    task = getattr(app.state, "auto_notify_task", None)
-    if task:
-        task.cancel()
+    for name in ("auto_notify_task", "bootstrap_task"):
+        task = getattr(app.state, name, None)
+        if task:
+            task.cancel()
     client.close()
 
 
