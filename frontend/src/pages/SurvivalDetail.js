@@ -227,30 +227,39 @@ export default function SurvivalDetail() {
               <BarChart3 size={15} className="shrink-0 mt-0.5" />
               <span>{summary.counts_hidden ? "Conteggi nascosti per privacy (pochi superstiti) fino al calcio d'inizio." : "Giornata visibile: ecco le scelte di tutti i partecipanti."}</span>
             </div>
-            {(summary.fixtures || []).map((f, i) => (
-              <div key={i} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold flex-1 truncate">{f.home_team}</span>
-                  <span className="text-xs text-[#94A3B8]">vs</span>
-                  <span className="font-extrabold flex-1 text-right truncate">{f.away_team}</span>
-                </div>
-                <div className="flex gap-2">
-                  {["1", "X", "2"].map((s) => (
-                    <div key={s} className="flex-1 rounded-lg bg-[#0F1216] border border-white/10 py-1.5 text-center">
-                      <div className="text-[11px] text-[#94A3B8]">{s}</div>
-                      <div className="font-extrabold text-[#F59E0B]">{f.counts?.[s] ?? 0}</div>
-                    </div>
-                  ))}
-                </div>
-                {Array.isArray(f.picks) && f.picks.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {f.picks.map((p, j) => (
-                      <span key={j} className={`text-[11px] px-2 py-0.5 rounded-full border ${p.correct === true ? "bg-[#00D95F]/15 border-[#00D95F]/40 text-[#00D95F]" : p.correct === false ? "bg-[#EF4444]/15 border-[#EF4444]/40 text-[#EF4444]" : "bg-white/5 border-white/10 text-[#94A3B8]"}`}>{p.nickname}: <b>{p.pick}</b></span>
-                    ))}
+            {(summary.fixtures || []).map((f, i) => {
+              const c1 = f.counts?.["1"] ?? 0, cx = f.counts?.["X"] ?? 0, c2 = f.counts?.["2"] ?? 0;
+              const total = c1 + cx + c2;
+              const winner = c1 >= cx && c1 >= c2 ? "1" : cx >= c2 ? "X" : "2";
+              return (
+                <div key={i} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold flex-1 truncate">{f.home_team}</span>
+                    <span className="text-xs text-[#94A3B8]">vs</span>
+                    <span className="font-extrabold flex-1 text-right truncate">{f.away_team}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {summary.counts_hidden ? (
+                    <div className="flex items-center gap-1.5 text-xs text-[#94A3B8] italic"><BarChart3 size={13} /> conteggi nascosti</div>
+                  ) : (
+                    <div className="flex gap-2">
+                      {["1", "X", "2"].map((s) => {
+                        const cnt = f.counts?.[s] ?? 0;
+                        const isWinner = total > 0 && cnt > 0 && s === winner;
+                        return (
+                          <div key={s} data-testid={`svd-sum-${i}-${s}`} className={`flex-1 rounded-lg border py-2 flex flex-col items-center gap-0.5 ${isWinner ? "bg-[#EF4444]/15 border-[#EF4444]" : "bg-[#0F1216] border-white/10"}`}>
+                            <div className={`text-sm font-extrabold ${isWinner ? "text-[#EF4444]" : "text-white"}`}>{s}</div>
+                            <div className="flex items-center gap-1">
+                              <span className={`font-extrabold ${isWinner ? "text-[#EF4444]" : "text-[#94A3B8]"}`}>{cnt}</span>
+                              <Heart size={11} className={isWinner ? "text-[#EF4444] fill-[#EF4444]" : "text-[#64748B]"} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

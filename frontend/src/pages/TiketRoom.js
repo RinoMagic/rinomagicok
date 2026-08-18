@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Trophy, Users, Copy, Upload, CheckCircle2, Camera, ChevronDown, Beer } from "lucide-react";
+import { ChevronLeft, Trophy, Users, Copy, Upload, CheckCircle2, Camera, ChevronDown, Beer, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
@@ -76,13 +76,32 @@ export default function TiketRoom() {
         <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-[#94A3B8]">
           <span>Giornata <b className="text-white">{room.matchday}</b></span>
           <span>Max eventi: {room.max_events}</span>
-          {room.status && <span className="uppercase text-xs">{room.status}</span>}
+          {room.status && <span data-testid="tkr-room-status" className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${room.status === "settled" ? "bg-[#00D95F]/20 text-[#00D95F]" : "bg-white/10 text-[#94A3B8]"}`}>{room.status === "settled" ? "Concluso" : room.status === "closed" ? "Chiusa" : "Aperta"}</span>}
         </div>
         {room.invite_code && (isAdmin || room.is_admin) && (
           <button data-testid="tkr-copy-code" onClick={() => { navigator.clipboard?.writeText(room.invite_code); toast.success("Codice copiato"); }} className="mt-3 inline-flex items-center gap-2 text-xs bg-white/10 rounded-md px-3 py-1.5">
             <Copy size={13} /> Codice invito: <b>{room.invite_code}</b>
           </button>
         )}
+      </div>
+
+      {/* Partecipanti + stato consegna schedina */}
+      <div>
+        <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Users size={18} className="text-[#F59E0B]" /> Partecipanti ({members.length})</h2>
+        <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
+          {members.length === 0 && <div className="px-4 py-6 text-center text-[#94A3B8]">Nessun partecipante.</div>}
+          {members.map((m) => (
+            <div key={m.user_id} data-testid={`tkr-member-${m.user_id}`} className="px-4 py-2.5 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#F59E0B]/20 flex items-center justify-center text-xs font-bold text-[#F59E0B] shrink-0">{(m.nickname || "?").slice(0, 2).toUpperCase()}</div>
+              <span className="flex-1 min-w-0 truncate font-medium">{m.nickname}</span>
+              {m.submitted ? (
+                <span data-testid={`tkr-badge-ok-${m.user_id}`} className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-[#00D95F]/15 text-[#00D95F] border border-[#00D95F]/40"><CheckCircle2 size={13} /> Giocata effettuata</span>
+              ) : (
+                <span data-testid={`tkr-badge-pending-${m.user_id}`} className="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full bg-white/5 text-[#94A3B8] border border-white/10"><Clock size={13} /> In attesa</span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {(isAdmin || room.is_admin) && <InvitesManager basePath={`/rooms/${roomId}`} />}

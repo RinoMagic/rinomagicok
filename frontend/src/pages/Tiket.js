@@ -117,7 +117,7 @@ export default function Tiket() {
                 <div className="flex items-center gap-3 mt-1 text-sm text-[#94A3B8]">
                   <span>Giornata {r.matchday}</span>
                   {r.members_count != null && <span className="flex items-center gap-1"><Users size={13} /> {r.members_count}</span>}
-                  {r.status && <span className="uppercase text-xs">{r.status}</span>}
+                  {r.status && <span className={`uppercase text-xs font-bold px-1.5 py-0.5 rounded ${r.status === "settled" ? "text-[#00D95F]" : ""}`}>{r.status === "settled" ? "Concluso" : r.status === "closed" ? "Chiusa" : "Aperta"}</span>}
                 </div>
               </button>
               {isAdmin && r.status === "settled" && (

@@ -63,7 +63,9 @@ export function SurvivaPicksModal({ tid, row, onClose }) {
               ) : (md.picks && md.picks.length > 0) ? (
                 <div className="space-y-1">
                   {md.picks.map((p, i) => {
-                    const outcome = md.settled ? (p.correct === true ? "ok" : p.correct === false ? "ko" : "na") : "na";
+                    // Suspended match (settled matchday, no result) stays VALID
+                    // and green — unlike postponed. Only correct===false is red.
+                    const outcome = md.settled ? (p.correct === false ? "ko" : "ok") : "na";
                     return (
                       <div key={i} className="flex items-center gap-2 py-1">
                         <span className="flex-1 min-w-0 truncate text-sm flex items-center gap-1.5">

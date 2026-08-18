@@ -518,6 +518,11 @@ def build_router(*, db, require_admin) -> APIRouter:
                     f"{api}/rooms/{room['id']}/fixtures",
                     json={"fixtures": room_fx},
                 )
+                if r.status_code == 200:
+                    # Room is now settled → shows as "Concluso" in the UI.
+                    await db.rooms.update_one(
+                        {"id": room["id"]}, {"$set": {"status": "settled"}},
+                    )
                 log.append({"game": "tiket", "room": room["name"],
                             "status": r.status_code,
                             "detail": r.json() if r.status_code == 200 else r.text[:200]})

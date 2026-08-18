@@ -3,7 +3,15 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
-## Migliorie — Anteprima default + velocità dettaglio Survival (2026-06)
+## Fix — 5 punti recuperati dall'originale (2026-06)
+1. **Banner giocata effettuata** (`TiketRoom.js`): sezione "Partecipanti" con badge verde "Giocata effettuata" (chi ha consegnato la schedina, da `/rooms/{id}/members` campo `submitted`) o "In attesa".
+2. **Avanzamento automatico Survival**: già nel backend (`settle` imposta `current_matchday=next`); confermato (torneo passa a G2 dopo calcolo G1).
+3. **Stato stanza/torneo Open→Concluso**: `matchday_settle` ora imposta `rooms.status='settled'` dopo il calcolo (Betting→Concluso); label "settled"→"Concluso" in `Tiket.js`/`TiketRoom.js`. Survival mostra "Concluso" quando `finished`.
+4. **Partita sospesa verde** (`SurvivaPicksModal.js`): su giornata calcolata, `correct===null` (sospesa, senza risultato) resa VERDE/valida (era grigia/orologio); `correct===false` resta rossa.
+5. **Riepilogo Survival** (`SurvivalDetail.js`): per partita 3 pill 1/X/2 con conteggio + cuore, vincente evidenziata, SENZA nomi dei giocatori.
+- Verified: testing agent iteration_13, backend 100% + frontend 5/5 + regressione. Backend modificato solo in matchday_settle (room settled).
+
+
 - **Anteprima default**: `GET /sv/.../participants/{uid}/picks` ora, per una giornata con deadline SCADUTA ma NON ancora calcolata, inietta le giocate di default in anteprima (`preview:true`, `auto_generated:true`, non persistite) — visibili come le altre solo dopo la scadenza. Al calcolo diventano picks reali. Modal mostra badge AUTO + icona orologio.
 - **Velocità**: l'endpoint caricava le deadline con 38 query sequenziali; ora una singola query batch (`dl_map` + `_parse_stored`) → apertura dettaglio da ~8s a ~1s.
 - Nota: giocata di default su partita SOSPESA (senza risultato) conserva la vita (corretto, non è un bug — confermato dall'utente).
