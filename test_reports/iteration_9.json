@@ -1,0 +1,21 @@
+{
+  "summary": "Feature 'Delete buttons on tornei/stanze/leghe' tested end-to-end. Backend: 8/8 pytest passed on DELETE endpoints for Survival, ScoreAndLive, TheBestTiket, FantaGiornata (create → delete → 404-verify + player-401/403 permission check). Frontend: verified as admin the sv-delete-{id} button on /survival deletes the card, does NOT navigate (stopPropagation OK), removes from list and from API. Verified regression: click on card body still navigates to /survival/{id}. Verified as player e1_qa_player that NO delete buttons (sv/sal/tk/fg-delete-*) appear on /survival, /scoreandlive, /tiket, /fanta.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_delete_buttons.py",
+    "/app/test_reports/pytest/iter9_delete_buttons.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Survival DELETE /sv/tournaments/{tid} uses require_admin dependency (global admin only). This is fine per spec but note that non-global-admin tournament creators cannot delete their own tornei — differs from FantaGiornata delete which uses _require_league_admin (allows league admin OR global admin).",
+    "SAL delete has nice safety guard: force=true required if picks exist (returns 409). Frontend must handle this two-step confirm (per user spec)."
+  ],
+  "updated_files": ["/app/backend/tests/test_delete_buttons.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "test_credentials": "Admin e1qa.admin@gmail.com/Test1234!  Player e1_qa_player/Test1234!",
+  "seed_data_creation": "All test data uses ZZ_DELETE_TEST_ prefix and is cleaned up (deleted) as part of each test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Regression test file test_delete_buttons.py covers all 4 delete endpoints. Reusable for future iterations. All tests create ZZ_DELETE_TEST_ prefixed entities so they never touch real production data."
+}

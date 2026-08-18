@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Activity, Plus, ChevronLeft, Heart } from "lucide-react";
+import { Activity, Plus, ChevronLeft, Heart, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -44,6 +44,24 @@ export default function ScoreAndLive() {
     } catch (e) { toast.error(e.message); }
   };
 
+  const remove = async (e, t) => {
+    e.stopPropagation();
+    if (!window.confirm(`Eliminare il torneo "${t.name}"? Verranno rimossi iscritti, giornate e pronostici. Operazione irreversibile.`)) return;
+    try {
+      await api(`/sal/tournaments/${t.id}`, { method: "DELETE" });
+      toast.success("Torneo eliminato"); load();
+    } catch (err) {
+      if (String(err.message || "").includes("storiche") || String(err.message || "").includes("force")) {
+        if (window.confirm("Il torneo contiene giocate storiche. Eliminarlo cancellerà lo storico. Confermi comunque?")) {
+          try { await api(`/sal/tournaments/${t.id}?force=true`, { method: "DELETE" }); toast.success("Torneo eliminato"); load(); }
+          catch (e2) { toast.error(e2.message); }
+        }
+        return;
+      }
+      toast.error(err.message);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <button data-testid="sal-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
@@ -79,16 +97,21 @@ export default function ScoreAndLive() {
       : (
         <div className="space-y-3">
           {tours.map((t) => (
-            <button key={t.id} data-testid={`sal-card-${t.id}`} onClick={() => navigate(`/scoreandlive/${t.id}`)} className="w-full text-left rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#3B82F6]/60 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-extrabold">{t.name}</span>
-                <Activity size={18} className="text-[#3B82F6]" />
-              </div>
-              <div className="flex items-center gap-4 mt-1 text-sm text-[#94A3B8]">
-                <span className="flex items-center gap-1 text-[#EF4444]"><Heart size={14} /> {t.players_alive ?? "?"}/{t.players_total ?? "?"}</span>
-                {t.status === "finished" && <span className="text-[#F59E0B]">Concluso</span>}
-              </div>
-            </button>
+            <div key={t.id} data-testid={`sal-card-${t.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 flex items-start gap-2 hover:border-[#3B82F6]/60 transition-colors">
+              <button onClick={() => navigate(`/scoreandlive/${t.id}`)} className="flex-1 min-w-0 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-extrabold">{t.name}</span>
+                  <Activity size={18} className="text-[#3B82F6]" />
+                </div>
+                <div className="flex items-center gap-4 mt-1 text-sm text-[#94A3B8]">
+                  <span className="flex items-center gap-1 text-[#EF4444]"><Heart size={14} /> {t.players_alive ?? "?"}/{t.players_total ?? "?"}</span>
+                  {t.status === "finished" && <span className="text-[#F59E0B]">Concluso</span>}
+                </div>
+              </button>
+              {isAdmin && (
+                <button data-testid={`sal-delete-${t.id}`} onClick={(e) => remove(e, t)} title="Elimina torneo" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
+              )}
+            </div>
           ))}
         </div>
       )}

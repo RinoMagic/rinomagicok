@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, Plus, Users, Shirt } from "lucide-react";
+import { ChevronLeft, Plus, Users, Shirt, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -42,6 +42,13 @@ export default function FantaGiornata() {
     } catch (e) { toast.error(e.message); }
   };
 
+  const remove = async (e, lg) => {
+    e.stopPropagation();
+    if (!window.confirm(`Eliminare la lega "${lg.name}"? Verranno rimossi iscritti, formazioni e punteggi. Operazione irreversibile.`)) return;
+    try { await api(`/fg/leagues/${lg.id}`, { method: "DELETE" }); toast.success("Lega eliminata"); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+
   return (
     <div className="space-y-5">
       <button data-testid="fg-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
@@ -73,16 +80,21 @@ export default function FantaGiornata() {
       : (
         <div className="space-y-3">
           {leagues.map((lg) => (
-            <button key={lg.id} data-testid={`fg-card-${lg.id}`} onClick={() => navigate(`/fanta/${lg.id}`)} className="w-full text-left rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#A855F7]/60 transition-colors flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-[#A855F7]/20 flex items-center justify-center"><Shirt size={22} className="text-[#A855F7]" /></div>
-              <div className="flex-1">
-                <div className="text-lg font-extrabold">{lg.name}</div>
-                <div className="flex items-center gap-3 mt-0.5 text-sm text-[#94A3B8]">
-                  <span className="flex items-center gap-1"><Users size={13} /> {lg.members_count}</span>
-                  {lg.is_admin && <span className="text-[#F59E0B] text-xs">admin</span>}
+            <div key={lg.id} data-testid={`fg-card-${lg.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#A855F7]/60 transition-colors flex items-center gap-3">
+              <button onClick={() => navigate(`/fanta/${lg.id}`)} className="flex-1 min-w-0 text-left flex items-center gap-3">
+                <div className="w-11 h-11 rounded-lg bg-[#A855F7]/20 flex items-center justify-center shrink-0"><Shirt size={22} className="text-[#A855F7]" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-lg font-extrabold">{lg.name}</div>
+                  <div className="flex items-center gap-3 mt-0.5 text-sm text-[#94A3B8]">
+                    <span className="flex items-center gap-1"><Users size={13} /> {lg.members_count}</span>
+                    {lg.is_admin && <span className="text-[#F59E0B] text-xs">admin</span>}
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              {isAdmin && (
+                <button data-testid={`fg-delete-${lg.id}`} onClick={(e) => remove(e, lg)} title="Elimina lega" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
+              )}
+            </div>
           ))}
         </div>
       )}

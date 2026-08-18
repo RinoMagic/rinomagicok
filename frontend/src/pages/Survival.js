@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, Plus, ChevronLeft, Ticket } from "lucide-react";
+import { Heart, Plus, ChevronLeft, Ticket, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -41,6 +41,13 @@ export default function Survival() {
       setCreating(false); setName("");
       navigate(`/survival/${t.id}`);
     } catch (e) { toast.error(e.message); }
+  };
+
+  const remove = async (e, t) => {
+    e.stopPropagation();
+    if (!window.confirm(`Eliminare il torneo "${t.name}"? Verranno rimossi iscritti, giornate e pronostici. Operazione irreversibile.`)) return;
+    try { await api(`/sv/tournaments/${t.id}`, { method: "DELETE" }); toast.success("Torneo eliminato"); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   return (
@@ -88,17 +95,22 @@ export default function Survival() {
       ) : (
         <div className="space-y-3">
           {tours.map((t) => (
-            <button key={t.id} data-testid={`sv-card-${t.id}`} onClick={() => navigate(`/survival/${t.id}`)} className="w-full text-left rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#EF4444]/60 transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-extrabold">{t.name}</span>
-                <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-[#94A3B8]">G{t.current_matchday}</span>
-              </div>
-              <div className="flex items-center gap-4 mt-2 text-sm text-[#94A3B8]">
-                <span className="flex items-center gap-1 text-[#EF4444]"><Heart size={14} /> {t.players_alive}/{t.players_total} vivi</span>
-                <span>{t.joined ? "Iscritto" : "Non iscritto"}</span>
-                {t.status === "finished" && <span className="text-[#F59E0B]">Concluso</span>}
-              </div>
-            </button>
+            <div key={t.id} data-testid={`sv-card-${t.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 flex items-start gap-2 hover:border-[#EF4444]/60 transition-colors">
+              <button onClick={() => navigate(`/survival/${t.id}`)} className="flex-1 min-w-0 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-extrabold">{t.name}</span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-[#94A3B8]">G{t.current_matchday}</span>
+                </div>
+                <div className="flex items-center gap-4 mt-2 text-sm text-[#94A3B8]">
+                  <span className="flex items-center gap-1 text-[#EF4444]"><Heart size={14} /> {t.players_alive}/{t.players_total} vivi</span>
+                  <span>{t.joined ? "Iscritto" : "Non iscritto"}</span>
+                  {t.status === "finished" && <span className="text-[#F59E0B]">Concluso</span>}
+                </div>
+              </button>
+              {isAdmin && (
+                <button data-testid={`sv-delete-${t.id}`} onClick={(e) => remove(e, t)} title="Elimina torneo" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
+              )}
+            </div>
           ))}
         </div>
       )}

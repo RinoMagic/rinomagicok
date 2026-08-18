@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, ChevronLeft, Users, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, Users, ChevronRight, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -41,6 +41,13 @@ export default function Tiket() {
       setCreating(false); setName("");
       navigate(`/tiket/${r.id}`);
     } catch (e) { toast.error(e.message); }
+  };
+
+  const remove = async (e, r) => {
+    e.stopPropagation();
+    if (!window.confirm(`Eliminare la stanza "${r.name}"? Verranno rimossi iscritti, schedine e risultati. Operazione irreversibile.`)) return;
+    try { await api(`/rooms/${r.id}`, { method: "DELETE" }); toast.success("Stanza eliminata"); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   return (
@@ -88,17 +95,20 @@ export default function Tiket() {
       ) : (
         <div className="space-y-3">
           {rooms.map((r) => (
-            <button key={r.id} data-testid={`tk-card-${r.id}`} onClick={() => navigate(`/tiket/${r.id}`)} className="w-full text-left rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#F59E0B]/60 transition-colors flex items-center gap-3">
-              <div className="flex-1">
+            <div key={r.id} data-testid={`tk-card-${r.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#F59E0B]/60 transition-colors flex items-center gap-3">
+              <button onClick={() => navigate(`/tiket/${r.id}`)} className="flex-1 min-w-0 text-left">
                 <div className="text-lg font-extrabold">{r.name}</div>
                 <div className="flex items-center gap-3 mt-1 text-sm text-[#94A3B8]">
                   <span>Giornata {r.matchday}</span>
                   {r.members_count != null && <span className="flex items-center gap-1"><Users size={13} /> {r.members_count}</span>}
                   {r.status && <span className="uppercase text-xs">{r.status}</span>}
                 </div>
-              </div>
-              <ChevronRight className="text-[#F59E0B]" size={20} />
-            </button>
+              </button>
+              {isAdmin && (
+                <button data-testid={`tk-delete-${r.id}`} onClick={(e) => remove(e, r)} title="Elimina stanza" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
+              )}
+              <ChevronRight className="text-[#F59E0B] shrink-0" size={20} />
+            </div>
           ))}
         </div>
       )}

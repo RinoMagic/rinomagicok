@@ -3,6 +3,11 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Feature — Elimina Tornei/Stanze/Leghe (2026-06)
+- Pulsante Elimina (icona cestino rosso, **solo admin**) su ogni card nelle 4 liste: Survival (`sv-delete-{id}` → DELETE /sv/tournaments/{id}), ScoreAndLive (`sal-delete-{id}` → DELETE /sal/tournaments/{id}?force, con doppia conferma se ci sono giocate storiche/409), Tiket stanze (`tk-delete-{id}` → DELETE /rooms/{id}), FantaGiornata leghe (`fg-delete-{id}` → DELETE /fg/leagues/{id}).
+- Card convertite da `<button>` a `<div>` con button interno per navigazione + button cestino separato (stopPropagation). Endpoint delete già esistenti nel backend (cascade). Verified: testing agent iteration_9 backend 8/8, frontend 100%, permessi player OK, regressione navigazione OK. Test regressione riutilizzabile: /app/backend/tests/test_delete_buttons.py.
+
+
 ## Implemented — iteration 8 (2026-06) — Ripristino STRUMENTI ADMIN
 - Pannello Admin ricostruito come menu a card "STRUMENTI ADMIN" (come l'originale) con 9 strumenti in `/app/frontend/src/pages/Admin.js` (stato `tool`, componenti in `/app/frontend/src/components/admin/`):
   1. **Calcola Giornata** — upload Excel voti (`/admin/voti/upload-xlsx` dry_run→commit), anteprima risultati modificabile + rinvii, conferma → `POST /admin/settle-matchday/preview|commit` (liquida tutti i giochi in un colpo, con `fixture_overrides`, `postponed_matches`, primo marcatore).
