@@ -372,6 +372,22 @@ def build_router(
                 {"_id": 0, "matchday": 1},
             ).sort("matchday", 1)
         ]
+        # Winner (only for a finished tournament): the last player standing.
+        winner_nickname = None
+        if t.get("status") == "finished":
+            w = await db.sv_participants.find_one(
+                {"tournament_id": t["id"], "eliminated_at": None},
+                {"_id": 0, "nickname": 1},
+            )
+            if not w:
+                # Fallback: the last one eliminated (highest matchday).
+                w = await db.sv_participants.find_one(
+                    {"tournament_id": t["id"]},
+                    {"_id": 0, "nickname": 1},
+                    sort=[("eliminated_matchday", -1)],
+                )
+            if w:
+                winner_nickname = w.get("nickname")
         return {
             "id": t["id"],
             "name": t["name"],
@@ -392,6 +408,7 @@ def build_router(
             "previous_tournament_id": t.get("previous_tournament_id"),
             "next_tournament_id": t.get("next_tournament_id"),
             "tie_break_matchdays": tie_break_matchdays,
+            "winner_nickname": winner_nickname,
         }
 
     # ------------------------------------------------------------------
@@ -934,6 +951,40 @@ def build_router(
                 valid_keys=cal_by_md.get(int(md.get("matchday") or 0), set()),
             ))
         return rows
+
+    @router.get("/tournaments/{tid}/recaps")
+    async def matchday_recaps(tid: str, user: dict = Depends(current_user)):
+        """Brief per-matchday recap for every SETTLED matchday, shown on the
+        tournament page: how many players were eliminated, who earned the Big
+        Match bonus (+1 life), and whether a tie-break/resurrection happened."""
+        await _get_tournament(tid)
+        participants = [p async for p in db.sv_participants.find(
+            {"tournament_id": tid},
+            {"_id": 0, "user_id": 1, "nickname": 1,
+             "eliminated_at": 1, "eliminated_matchday": 1},
+        )]
+        nick = {p["user_id"]: p.get("nickname") or "?" for p in participants}
+        out = []
+        async for md in db.sv_matchdays.find(
+            {"tournament_id": tid, "status": "settled"},
+            {"_id": 0, "matchday": 1, "tie_break": 1, "big_match_bonus_users": 1},
+        ).sort("matchday", 1):
+            mdn = md["matchday"]
+            eliminated_names = [
+                nick.get(p["user_id"], "?") for p in participants
+                if p.get("eliminated_matchday") == mdn and p.get("eliminated_at")
+            ]
+            bonus_users = md.get("big_match_bonus_users") or []
+            bonus_names = [nick.get(uid, "?") for uid in bonus_users]
+            out.append({
+                "matchday": mdn,
+                "tie_break": bool(md.get("tie_break")),
+                "eliminated_count": len(eliminated_names),
+                "eliminated_names": eliminated_names,
+                "bonus_count": len(bonus_names),
+                "bonus_names": bonus_names,
+            })
+        return out
 
     @router.get("/tournaments/{tid}/matchdays/current")
     async def current_matchday(tid: str, user: dict = Depends(current_user)):

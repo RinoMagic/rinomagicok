@@ -3,6 +3,10 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Fix — Riepilogo per giornata + banner vincitore (2026-06, iter 15)
+- **Riepilogo per ogni giornata conclusa**: nuovo endpoint `GET /sv/tournaments/{tid}/recaps` (per ogni MD settled: `eliminated_count`+`eliminated_names`, `bonus_count`+`bonus_names`, `tie_break`). `SurvivalDetail.js` mostra una card per giornata conclusa sotto il nome torneo: tie-break → banner ambra resurrezione; altrimenti "Giornata N conclusa · N eliminati · N bonus · Bonus vita: nomi · Eliminati: nomi". Verificato: G1(0 elim,2 bonus), G2(3 elim,1 bonus), G3(tie-break) — screenshot OK.
+- **Banner vincitore**: `_tournament_dict` ora restituisce `winner_nickname` (ultimo superstite) quando `status=finished`. `SurvivalDetail.js` mostra banner verde "Il vincitore è <nome> 🏆". Verificato con torneo usa-e-getta (poi eliminato): finished → winner_nickname='verone.salvatore'.
+
 ## Fix — Evidenzia Tie-break/Resurrezione nella pagina torneo (2026-06, iter 15)
 - La logica backend di resurrezione (tutti i vivi muoiono nella stessa giornata → ripristinati allo stato della giornata precedente, `md.tie_break=True`) esisteva ma non era mostrata. Ora `_tournament_dict` restituisce `tie_break_matchdays` (lista giornate con tie-break) e `SurvivalDetail.js` mostra un banner ambra evidenziato sotto il nome del torneo: "TIE-BREAK · RESURREZIONE G{n} — Tutti i partecipanti sono morti: si rigioca con le stesse condizioni della giornata precedente". Verificato: torneo test1 → G3 tie-break → banner "RESURREZIONE G3" (screenshot OK, API tie_break_matchdays=[3]).
 

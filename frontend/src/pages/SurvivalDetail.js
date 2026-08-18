@@ -23,6 +23,7 @@ export default function SurvivalDetail() {
   const [summary, setSummary] = useState(null);
   const [mdList, setMdList] = useState([]);
   const [summaryMd, setSummaryMd] = useState(null);
+  const [recaps, setRecaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRow, setSelectedRow] = useState(null);
 
@@ -56,6 +57,7 @@ export default function SurvivalDetail() {
 
   useEffect(() => {
     api(`/sv/tournaments/${tid}/matchdays`).then((r) => setMdList(Array.isArray(r) ? r : (r.matchdays || []))).catch(() => {});
+    api(`/sv/tournaments/${tid}/recaps`).then((r) => setRecaps(Array.isArray(r) ? r : [])).catch(() => {});
   }, [tid]);
 
   const required = myPicks.required || locked.lives_left || 0;
@@ -137,17 +139,46 @@ export default function SurvivalDetail() {
           {t.joined && <span className="text-[#F59E0B] flex items-center gap-1"><Heart size={14} /> Le tue vite: {locked.lives_left}</span>}
           {t.status === "finished" && <span className="text-[#F59E0B] font-bold">Concluso</span>}
         </div>
-        {Array.isArray(t.tie_break_matchdays) && t.tie_break_matchdays.length > 0 && (
-          <div data-testid="svd-tiebreak-banner" className="mt-3 rounded-lg border border-[#F59E0B] bg-[#F59E0B]/10 p-3 flex items-start gap-2.5">
-            <RefreshCw size={18} className="text-[#F59E0B] shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <div className="font-extrabold text-[#F59E0B] uppercase tracking-wide">
-                Tie-break · Resurrezione {t.tie_break_matchdays.map((m) => `G${m}`).join(", ")}
-              </div>
-              <div className="text-[#F8C471] mt-0.5">
-                Tutti i partecipanti sono morti: si rigioca con le stesse condizioni della giornata precedente.
-              </div>
+        {t.status === "finished" && t.winner_nickname && (
+          <div data-testid="svd-winner-banner" className="mt-3 rounded-lg border border-[#00D95F] bg-[#00D95F]/10 p-3 flex items-center gap-2.5">
+            <Trophy size={20} className="text-[#00D95F] shrink-0" />
+            <div className="text-base">
+              <span className="text-[#94A3B8]">Il vincitore è </span>
+              <b className="text-[#00D95F] text-lg" data-testid="svd-winner-name">{t.winner_nickname}</b>
+              <span className="ml-1">🏆</span>
             </div>
+          </div>
+        )}
+        {Array.isArray(recaps) && recaps.length > 0 && (
+          <div className="mt-3 space-y-2" data-testid="svd-recaps">
+            {recaps.slice().reverse().map((r) => (
+              r.tie_break ? (
+                <div key={r.matchday} data-testid={`svd-recap-${r.matchday}`} className="rounded-lg border border-[#F59E0B] bg-[#F59E0B]/10 p-3 flex items-start gap-2.5">
+                  <RefreshCw size={18} className="text-[#F59E0B] shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-extrabold text-[#F59E0B] uppercase tracking-wide">Tie-break · Resurrezione G{r.matchday}</div>
+                    <div className="text-[#F8C471] mt-0.5">Tutti i partecipanti sono morti: si rigioca con le stesse condizioni della giornata precedente.</div>
+                  </div>
+                </div>
+              ) : (
+                <div key={r.matchday} data-testid={`svd-recap-${r.matchday}`} className="rounded-lg border border-white/10 bg-[#0F1216] p-3 flex items-start gap-2.5">
+                  <BarChart3 size={16} className="text-[#94A3B8] shrink-0 mt-0.5" />
+                  <div className="text-sm flex-1 min-w-0">
+                    <div className="font-extrabold text-white">Giornata {r.matchday} conclusa</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span className="flex items-center gap-1 text-[#EF4444]"><Skull size={13} /> {r.eliminated_count} {r.eliminated_count === 1 ? "eliminato" : "eliminati"}</span>
+                      <span className="flex items-center gap-1 text-[#F59E0B]"><Gift size={13} /> {r.bonus_count} bonus</span>
+                    </div>
+                    {r.bonus_count > 0 && (
+                      <div className="mt-1 text-xs text-[#F8C471]">Bonus vita: <b>{r.bonus_names.join(", ")}</b></div>
+                    )}
+                    {r.eliminated_count > 0 && r.eliminated_names.length > 0 && (
+                      <div className="mt-0.5 text-xs text-[#94A3B8]">Eliminati: {r.eliminated_names.join(", ")}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            ))}
           </div>
         )}
         {(isAdmin || t.is_admin) && t.invite_code && (
