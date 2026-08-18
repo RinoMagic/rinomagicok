@@ -363,6 +363,15 @@ def build_router(
         joined = False
         if viewer:
             joined = bool(await _get_participant(t["id"], viewer["id"]))
+        # Tie-break / resurrezione: matchdays where ALL alive players died and
+        # were restored to the previous matchday's state (surfaced on the
+        # tournament page so the event is clearly highlighted).
+        tie_break_matchdays = [
+            md["matchday"] async for md in db.sv_matchdays.find(
+                {"tournament_id": t["id"], "tie_break": True},
+                {"_id": 0, "matchday": 1},
+            ).sort("matchday", 1)
+        ]
         return {
             "id": t["id"],
             "name": t["name"],
@@ -382,6 +391,7 @@ def build_router(
             "archived": bool(t.get("archived", False)),
             "previous_tournament_id": t.get("previous_tournament_id"),
             "next_tournament_id": t.get("next_tournament_id"),
+            "tie_break_matchdays": tie_break_matchdays,
         }
 
     # ------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3, FileDown, Gift, ChevronRight, CheckCircle2, Circle } from "lucide-react";
+import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3, FileDown, Gift, ChevronRight, CheckCircle2, Circle, RefreshCw } from "lucide-react";
 import { api, apiDownload } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
@@ -137,6 +137,19 @@ export default function SurvivalDetail() {
           {t.joined && <span className="text-[#F59E0B] flex items-center gap-1"><Heart size={14} /> Le tue vite: {locked.lives_left}</span>}
           {t.status === "finished" && <span className="text-[#F59E0B] font-bold">Concluso</span>}
         </div>
+        {Array.isArray(t.tie_break_matchdays) && t.tie_break_matchdays.length > 0 && (
+          <div data-testid="svd-tiebreak-banner" className="mt-3 rounded-lg border border-[#F59E0B] bg-[#F59E0B]/10 p-3 flex items-start gap-2.5">
+            <RefreshCw size={18} className="text-[#F59E0B] shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-extrabold text-[#F59E0B] uppercase tracking-wide">
+                Tie-break · Resurrezione {t.tie_break_matchdays.map((m) => `G${m}`).join(", ")}
+              </div>
+              <div className="text-[#F8C471] mt-0.5">
+                Tutti i partecipanti sono morti: si rigioca con le stesse condizioni della giornata precedente.
+              </div>
+            </div>
+          </div>
+        )}
         {(isAdmin || t.is_admin) && t.invite_code && (
           <button data-testid="svd-copy-code" onClick={() => { navigator.clipboard?.writeText(t.invite_code); toast.success("Codice copiato"); }} className="mt-3 inline-flex items-center gap-2 text-xs bg-white/10 rounded-md px-3 py-1.5">
             <Copy size={13} /> Codice invito: <b>{t.invite_code}</b>

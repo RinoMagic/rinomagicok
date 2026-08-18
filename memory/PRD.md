@@ -3,6 +3,9 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Fix — Evidenzia Tie-break/Resurrezione nella pagina torneo (2026-06, iter 15)
+- La logica backend di resurrezione (tutti i vivi muoiono nella stessa giornata → ripristinati allo stato della giornata precedente, `md.tie_break=True`) esisteva ma non era mostrata. Ora `_tournament_dict` restituisce `tie_break_matchdays` (lista giornate con tie-break) e `SurvivalDetail.js` mostra un banner ambra evidenziato sotto il nome del torneo: "TIE-BREAK · RESURREZIONE G{n} — Tutti i partecipanti sono morti: si rigioca con le stesse condizioni della giornata precedente". Verificato: torneo test1 → G3 tie-break → banner "RESURREZIONE G3" (screenshot OK, API tie_break_matchdays=[3]).
+
 ## Fix — 404 al login su deploy/restart (2026-06, iter 15) ✅ RISOLTO
 - **Causa**: `server.py::startup()` attendeva (await) creazione indici Atlas + backfill + `seed_admin_if_missing` (~15-18s) PRIMA che l'app diventasse pronta → l'ingress rispondeva 404/502 su `/api/auth/login` durante quella finestra ad ogni deploy/riavvio container.
 - **Fix**: tutto il lavoro pesante (indici, backfill, seed) spostato in un task background (`app.state.bootstrap_task` via `asyncio.create_task`). `startup()` ora ritorna subito e tutte le route (login incluso) sono servite immediatamente. `_auto_notify_loop` ritardato di 15s. Log verificati: "Application startup complete" immediato, "bootstrap complete" ~11s dopo. deployment_agent: PASS, nessun blocco.
