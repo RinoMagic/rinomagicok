@@ -7,7 +7,7 @@ Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port 
 1. **Banner giocata effettuata** (`TiketRoom.js`): sezione "Partecipanti" con badge verde "Giocata effettuata" (chi ha consegnato la schedina, da `/rooms/{id}/members` campo `submitted`) o "In attesa".
 2. **Avanzamento automatico Survival**: già nel backend (`settle` imposta `current_matchday=next`); confermato (torneo passa a G2 dopo calcolo G1).
 3. **Stato stanza/torneo Open→Concluso**: `matchday_settle` ora imposta `rooms.status='settled'` dopo il calcolo (Betting→Concluso); label "settled"→"Concluso" in `Tiket.js`/`TiketRoom.js`. Survival mostra "Concluso" quando `finished`.
-4. **Partita sospesa verde** (`SurvivaPicksModal.js`): su giornata calcolata, `correct===null` (sospesa, senza risultato) resa VERDE/valida (era grigia/orologio); `correct===false` resta rossa.
+4. **Partita sospesa verde** (`SurvivaPicksModal.js`): su giornata calcolata, `correct===null` (sospesa, senza risultato) resa VERDE/valida (era grigia/orologio); `correct===false` resta rossa. Aggiunta etichetta **SOSPESA** (verde) accanto a queste giocate per chiarezza.
 5. **Riepilogo Survival** (`SurvivalDetail.js`): per partita 3 pill 1/X/2 con conteggio + cuore, vincente evidenziata, SENZA nomi dei giocatori.
 - Verified: testing agent iteration_13, backend 100% + frontend 5/5 + regressione. Backend modificato solo in matchday_settle (room settled).
 
