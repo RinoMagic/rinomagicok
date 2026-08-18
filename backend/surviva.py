@@ -768,8 +768,59 @@ def build_router(
         except Exception:
             return md.get("status") in {"locked", "settled"}
 
-    async def _matchday_dict(md: dict, viewer_id: Optional[str] = None) -> dict:
+    async def _valid_calendar_keys(season, matchday) -> set:
+        """Set of (home,away) fixtures that CURRENTLY exist in the season
+        calendar and are NOT excluded. Used to filter playable fixtures live,
+        so a match deleted/excluded from the calendar disappears from the
+        pick screen even if an old matchday snapshot still references it."""
+        keys: set = set()
+        if not season or matchday is None:
+            return keys
+        async for cf in db.sal_calendar.find(
+            {"season": season, "matchday": matchday, "excluded": {"$ne": True}},
+            {"_id": 0, "home_team": 1, "away_team": 1},
+        ):
+            keys.add(((cf.get("home_team") or "").strip().lower(),
+                      (cf.get("away_team") or "").strip().lower()))
+        return keys
+
+    def _key(f: dict):
+        return ((f.get("home_team") or "").strip().lower(),
+                (f.get("away_team") or "").strip().lower())
+
+    async def _effective_fixtures(md: dict) -> List[dict]:
+        """Playable fixtures of a matchday: snapshot minus excluded/postponed,
+        AND (for non-settled matchdays) reconciled live against the season
+        calendar so deleted/excluded matches never remain playable."""
+        out = [f for f in md.get("fixtures", [])
+               if not f.get("excluded") and not f.get("postponed_before")]
+        if md.get("status") != "settled":
+            valid = await _valid_calendar_keys(md.get("season"), md.get("matchday"))
+            out = [f for f in out if _key(f) in valid]
+        return out
+
+    async def _matchday_dict(
+        md: dict, viewer_id: Optional[str] = None, valid_keys: Optional[set] = None,
+    ) -> dict:
         locked = _md_is_locked(md)
+        settled = md.get("status") == "settled"
+        # Base filter: drop fixtures flagged excluded/postponed in the snapshot.
+        fixtures_out = [
+            f for f in md.get("fixtures", [])
+            if not f.get("excluded") and not f.get("postponed_before")
+        ]
+        # LIVE reconciliation for non-settled matchdays: only keep fixtures
+        # that still exist (and are not excluded) in the season calendar.
+        if not settled:
+            if valid_keys is None:
+                valid_keys = await _valid_calendar_keys(
+                    md.get("season"), md.get("matchday"),
+                )
+            fixtures_out = [
+                f for f in fixtures_out
+                if ((f.get("home_team") or "").strip().lower(),
+                    (f.get("away_team") or "").strip().lower()) in valid_keys
+            ]
         my_picks_count = 0
         picks_required = REQUIRED_PICKS_PER_MATCHDAY  # fallback
         my_big_match_bonus_won = False
@@ -838,10 +889,7 @@ def build_router(
             "season": md.get("season"),
             "status": md.get("status", "open"),
             "kickoff_first": md.get("kickoff_first"),
-            "fixtures": [
-                f for f in md.get("fixtures", [])
-                if not f.get("excluded") and not f.get("postponed_before")
-            ],
+            "fixtures": fixtures_out,
             "locked": locked,
             "settled": md.get("status") == "settled",
             "tie_break": bool(md.get("tie_break")),
@@ -855,11 +903,26 @@ def build_router(
 
     @router.get("/tournaments/{tid}/matchdays")
     async def list_matchdays(tid: str, user: dict = Depends(current_user)):
-        await _get_tournament(tid)
+        t = await _get_tournament(tid)
+        season = t.get("season")
+        # Batch-load calendar keys once, grouped by matchday, to avoid one
+        # sal_calendar query per matchday inside _matchday_dict.
+        cal_by_md: Dict[int, set] = {}
+        async for cf in db.sal_calendar.find(
+            {"season": season, "excluded": {"$ne": True}},
+            {"_id": 0, "matchday": 1, "home_team": 1, "away_team": 1},
+        ):
+            cal_by_md.setdefault(int(cf["matchday"]), set()).add(
+                ((cf.get("home_team") or "").strip().lower(),
+                 (cf.get("away_team") or "").strip().lower())
+            )
         cursor = db.sv_matchdays.find({"tournament_id": tid}, {"_id": 0}).sort("matchday", 1)
         rows = []
         async for md in cursor:
-            rows.append(await _matchday_dict(md, user["id"]))
+            rows.append(await _matchday_dict(
+                md, user["id"],
+                valid_keys=cal_by_md.get(int(md.get("matchday") or 0), set()),
+            ))
         return rows
 
     @router.get("/tournaments/{tid}/matchdays/current")
@@ -945,7 +1008,19 @@ def build_router(
         target_lives = int(target.get("lives_left") or 0)
         target_locks = set(target.get("locked_teams") or [])
 
-        def _preview_defaults(md: dict, existing: List[dict]) -> List[dict]:
+        # Batch-load valid calendar keys per matchday (deleted/excluded
+        # matches are filtered out of preview defaults too).
+        cal_by_md: Dict[int, set] = {}
+        async for cf in db.sal_calendar.find(
+            {"season": season, "excluded": {"$ne": True}},
+            {"_id": 0, "matchday": 1, "home_team": 1, "away_team": 1},
+        ):
+            cal_by_md.setdefault(int(cf["matchday"]), set()).add(
+                ((cf.get("home_team") or "").strip().lower(),
+                 (cf.get("away_team") or "").strip().lower())
+            )
+
+        def _preview_defaults(md: dict, existing: List[dict], valid_keys: set) -> List[dict]:
             """Compute (non-persisted) default picks for display AFTER the
             deadline but BEFORE settlement — same rule as the settle-time
             auto-fill: first fixture first, sign respecting team blocks."""
@@ -959,7 +1034,11 @@ def build_router(
                 if needed <= 0:
                     break
                 key = (fx.get("home_team"), fx.get("away_team"))
+                nk = ((fx.get("home_team") or "").strip().lower(),
+                      (fx.get("away_team") or "").strip().lower())
                 if key in picked_keys or fx.get("excluded") or fx.get("postponed_before"):
+                    continue
+                if nk not in valid_keys:
                     continue
                 home, away = fx.get("home_team"), fx.get("away_team")
                 if home not in target_locks:
@@ -1008,7 +1087,9 @@ def build_router(
                 # default picks the player WILL receive at calcolo, so the
                 # giocata is visible like everyone else's (marked preview).
                 if not settled and deadline_passed and target.get("eliminated_at") is None:
-                    existing = existing + _preview_defaults(md, existing)
+                    existing = existing + _preview_defaults(
+                        md, existing, cal_by_md.get(int(md_num), set()),
+                    )
                 entry["picks"] = existing
             out.append(entry)
 
@@ -1096,7 +1177,7 @@ def build_router(
             )
 
         fixtures_by_key = {
-            (f["home_team"], f["away_team"]): f for f in md.get("fixtures", [])
+            (f["home_team"], f["away_team"]): f for f in await _effective_fixtures(md)
         }
         locked_teams: set = set(p.get("locked_teams") or [])
 
@@ -1204,7 +1285,7 @@ def build_router(
         """
         picks_created = 0
         users_filled = 0
-        fixtures = list(md.get("fixtures", []))
+        fixtures = await _effective_fixtures(md)
         if not fixtures:
             return {"users_filled": 0, "picks_created": 0}
         participants = [p async for p in db.sv_participants.find(
@@ -1802,9 +1883,9 @@ def build_router(
         counts_hidden = (not locked) and alive_count > 0 and alive_count <= PRIVACY_THRESHOLD
         picks_cur = db.sv_picks.find({"tournament_id": tid, "matchday_id": md_id})
 
-        # Aggregate counts per fixture
+        # Aggregate counts per fixture (deleted/excluded matches filtered out)
         agg: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        for f in md.get("fixtures", []):
+        for f in await _effective_fixtures(md):
             agg[(f["home_team"], f["away_team"])] = {
                 "home_team": f["home_team"],
                 "away_team": f["away_team"],
