@@ -1105,6 +1105,7 @@ def build_router(
             "submissions_locked": submissions_locked,
             "settled": settled,
             "is_admin": is_admin_of_room,
+            "archived": bool(room.get("archived", False)),
         }
 
     async def _ensure_submissions_open(room: dict) -> None:
@@ -1524,6 +1525,18 @@ def build_router(
         room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
         if not room:
             raise HTTPException(status_code=404, detail="Stanza non trovata")
+        return await _room_dict(room, user)
+
+    @router.post("/rooms/{room_id}/archive")
+    async def archive_room(room_id: str, archived: bool = True, user: dict = Depends(require_admin)):
+        """Archive/unarchive a SETTLED room (keeps history, hides from active list)."""
+        room = await db.rooms.find_one({"id": room_id}, {"_id": 0})
+        if not room:
+            raise HTTPException(status_code=404, detail="Stanza non trovata")
+        if archived and room.get("status") != "settled":
+            raise HTTPException(status_code=400, detail="Solo le stanze concluse (liquidate) possono essere archiviate")
+        await db.rooms.update_one({"id": room_id}, {"$set": {"archived": bool(archived)}})
+        room["archived"] = bool(archived)
         return await _room_dict(room, user)
 
     @router.delete("/rooms/{room_id}")

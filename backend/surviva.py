@@ -379,6 +379,7 @@ def build_router(
             "players_alive": alive,
             "is_admin": is_admin,
             "joined": joined,
+            "archived": bool(t.get("archived", False)),
             "previous_tournament_id": t.get("previous_tournament_id"),
             "next_tournament_id": t.get("next_tournament_id"),
         }
@@ -625,6 +626,16 @@ def build_router(
         )
         inv["revoked_at"] = _now()
         return await _invite_dict(inv)
+
+    @router.post("/tournaments/{tid}/archive")
+    async def archive_tournament(tid: str, archived: bool = True, user: dict = Depends(require_admin)):
+        """Archive/unarchive a FINISHED tournament (keeps history, hides from active list)."""
+        t = await _get_tournament(tid)
+        if archived and t.get("status") != "finished":
+            raise HTTPException(status_code=400, detail="Solo i tornei conclusi possono essere archiviati")
+        await db.sv_tournaments.update_one({"id": tid}, {"$set": {"archived": bool(archived)}})
+        t["archived"] = bool(archived)
+        return await _tournament_dict(t, user)
 
     @router.delete("/tournaments/{tid}")
     async def delete_tournament(tid: str, user: dict = Depends(require_admin)):

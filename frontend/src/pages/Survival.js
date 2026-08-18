@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, Plus, ChevronLeft, Ticket, Trash2 } from "lucide-react";
+import { Heart, Plus, ChevronLeft, Ticket, Trash2, Archive, ArchiveRestore } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -16,10 +16,11 @@ export default function Survival() {
   const [name, setName] = useState("");
   const [lives, setLives] = useState(3);
   const [startMd, setStartMd] = useState(1);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setTours(await api("/sv/tournaments")); } catch (e) { toast.error(e.message); }
+    try { setTours(await api("/sv/tournaments?include_finished=true")); } catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -49,6 +50,22 @@ export default function Survival() {
     try { await api(`/sv/tournaments/${t.id}`, { method: "DELETE" }); toast.success("Torneo eliminato"); load(); }
     catch (err) { toast.error(err.message); }
   };
+
+  const archive = async (e, t) => {
+    e.stopPropagation();
+    if (!window.confirm(`Archiviare il torneo "${t.name}"? Resterà consultabile nella sezione Archiviati.`)) return;
+    try { await api(`/sv/tournaments/${t.id}/archive?archived=true`, { method: "POST" }); toast.success("Torneo archiviato"); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+
+  const unarchive = async (e, t) => {
+    e.stopPropagation();
+    try { await api(`/sv/tournaments/${t.id}/archive?archived=false`, { method: "POST" }); toast.success("Torneo ripristinato"); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+
+  const activeTours = tours.filter((t) => !t.archived);
+  const archivedTours = tours.filter((t) => t.archived);
 
   return (
     <div className="space-y-5">
@@ -90,11 +107,11 @@ export default function Survival() {
 
       {loading ? (
         <div className="py-12 text-center text-[#94A3B8]">Caricamento...</div>
-      ) : tours.length === 0 ? (
+      ) : activeTours.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-[#181D22] p-8 text-center text-[#94A3B8]">Nessun torneo attivo. Usa un codice invito per entrare.</div>
       ) : (
         <div className="space-y-3">
-          {tours.map((t) => (
+          {activeTours.map((t) => (
             <div key={t.id} data-testid={`sv-card-${t.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 flex items-start gap-2 hover:border-[#EF4444]/60 transition-colors">
               <button onClick={() => navigate(`/survival/${t.id}`)} className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between">
@@ -107,9 +124,30 @@ export default function Survival() {
                   {t.status === "finished" && <span className="text-[#F59E0B]">Concluso</span>}
                 </div>
               </button>
+              {isAdmin && t.status === "finished" && (
+                <button data-testid={`sv-archive-${t.id}`} onClick={(e) => archive(e, t)} title="Archivia torneo" className="p-2 rounded-md text-[#F59E0B] hover:bg-[#F59E0B]/10 shrink-0"><Archive size={18} /></button>
+              )}
               {isAdmin && (
                 <button data-testid={`sv-delete-${t.id}`} onClick={(e) => remove(e, t)} title="Elimina torneo" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isAdmin && archivedTours.length > 0 && (
+        <div className="space-y-3">
+          <button data-testid="sv-archived-toggle" onClick={() => setShowArchived((v) => !v)} className="flex items-center gap-2 text-sm text-[#94A3B8] hover:text-white transition-colors">
+            <Archive size={15} /> Archiviati ({archivedTours.length}) {showArchived ? "▲" : "▼"}
+          </button>
+          {showArchived && archivedTours.map((t) => (
+            <div key={t.id} data-testid={`sv-archived-${t.id}`} className="w-full rounded-xl border border-white/5 bg-[#12161A] p-4 flex items-center gap-2 opacity-80">
+              <button onClick={() => navigate(`/survival/${t.id}`)} className="flex-1 min-w-0 text-left">
+                <span className="font-bold">{t.name}</span>
+                <span className="ml-2 text-xs text-[#94A3B8]">Concluso · archiviato</span>
+              </button>
+              <button data-testid={`sv-unarchive-${t.id}`} onClick={(e) => unarchive(e, t)} title="Ripristina" className="p-2 rounded-md text-[#00D95F] hover:bg-white/5 shrink-0"><ArchiveRestore size={18} /></button>
+              <button data-testid={`sv-delete-${t.id}`} onClick={(e) => remove(e, t)} title="Elimina" className="p-2 rounded-md text-[#EF4444] hover:bg-white/5 shrink-0"><Trash2 size={18} /></button>
             </div>
           ))}
         </div>

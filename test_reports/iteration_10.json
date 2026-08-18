@@ -1,0 +1,22 @@
+{
+  "summary": "Feature 'Archivia Torneo' tested end-to-end across all 4 games. BACKEND: 8/8 pytest passed in test_archive_buttons.py — for each of Survival/SAL/Tiket/Fanta: gate returns 400 when entity NOT in 'concluso' state (status!=finished / status!=settled / current_matchday==null); after forcing the state via DB, POST /archive?archived=true returns 200 with archived=true; GET list shows archived=true (Survival include_finished=true); POST /archive?archived=false returns archived=false; PLAYER (e1_qa_player) receives 401/403 on all 4 archive endpoints. FRONTEND (Survival end-to-end as admin): sv-archive-{id} appears only on 'Concluso' cards (regression verified: open tournament 'test1' has NO archive button), click archives without navigating to detail (stopPropagation OK, URL stays /survival), sv-archived-toggle appears, opening it reveals sv-archived-{id} card with sv-unarchive-{id} + sv-delete-{id} buttons, clicking Ripristina restores card to active list. SMOKE (SAL/Tiket/Fanta pages load with no errors). PLAYER visibility: on /survival, /scoreandlive, /tiket, /fanta the player e1_qa_player sees ZERO archive/unarchive/delete buttons and ZERO archived toggles.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_archive_buttons.py",
+    "/app/test_reports/pytest/iter10_archive.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Survival & SAL archive gates hardcode Italian error string 'Solo i tornei conclusi possono essere archiviati' — consistent with Tiket ('Solo le stanze concluse') and Fanta. Good UX but consider centralizing.",
+    "Archive endpoints for SAL & Fanta accept `archived: bool = True` from query but do not validate the entity has to be finished/settled/played to UN-archive (only the archive=true path checks gate). This is by design (unarchive should always be allowed), and behaves consistently. OK.",
+    "Fanta uses `_require_league_admin` (403 correctly returned to non-admin player), while Survival/SAL/Tiket use global `require_admin`. Same as delete endpoints — acceptable but worth documenting."
+  ],
+  "updated_files": ["/app/backend/tests/test_archive_buttons.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (7/7 checks)"},
+  "test_credentials": "Admin e1qa.admin@gmail.com/Test1234!  Player e1_qa_player/Test1234!",
+  "seed_data_creation": "Backend tests create ZZ_ARCH_* entities via API, force state via direct MongoDB update, and delete them in teardown. FE test seeded 1 tournament ZZ_ARCH_FE_b7329d, exercised the flow, and cleaned it up (DELETE /api/sv/tournaments/{tid}). Verified 0 ZZ_ARCH leftovers in production DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reusable regression tests at /app/backend/tests/test_archive_buttons.py (archive) and test_delete_buttons.py (delete) cover all 4 games. All backend tests must run WITHOUT xdist parallelism because the module-scope DB fixture and API sessions serialize per-worker and the archive gate flow is single-threaded (run with `pytest -o addopts=\"\"`). The unified login page uses ONE input with placeholder 'Email o Nickname'; use `input[placeholder*=\"Email\"], input[placeholder*=\"Nickname\"]` selector for both admin (email) and player (username)."
+}

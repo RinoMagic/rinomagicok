@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, ChevronLeft, Users, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, Users, ChevronRight, Trash2, Archive, ArchiveRestore } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { BonusBanner } from "@/components/BonusBanner";
@@ -16,6 +16,7 @@ export default function Tiket() {
   const [name, setName] = useState("");
   const [matchday, setMatchday] = useState(1);
   const [maxEvents, setMaxEvents] = useState(5);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,21 @@ export default function Tiket() {
     try { await api(`/rooms/${r.id}`, { method: "DELETE" }); toast.success("Stanza eliminata"); load(); }
     catch (err) { toast.error(err.message); }
   };
+
+  const archive = async (e, r) => {
+    e.stopPropagation();
+    if (!window.confirm(`Archiviare la stanza "${r.name}"? Resterà consultabile nella sezione Archiviate.`)) return;
+    try { await api(`/rooms/${r.id}/archive?archived=true`, { method: "POST" }); toast.success("Stanza archiviata"); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+  const unarchive = async (e, r) => {
+    e.stopPropagation();
+    try { await api(`/rooms/${r.id}/archive?archived=false`, { method: "POST" }); toast.success("Stanza ripristinata"); load(); }
+    catch (err) { toast.error(err.message); }
+  };
+
+  const activeRooms = rooms.filter((r) => !r.archived);
+  const archivedRooms = rooms.filter((r) => r.archived);
 
   return (
     <div className="space-y-5">
@@ -90,11 +106,11 @@ export default function Tiket() {
 
       {loading ? (
         <div className="py-12 text-center text-[#94A3B8]">Caricamento...</div>
-      ) : rooms.length === 0 ? (
+      ) : activeRooms.length === 0 ? (
         <div className="rounded-xl border border-white/10 bg-[#181D22] p-8 text-center text-[#94A3B8]">Nessuna stanza. Usa un codice invito per entrare.</div>
       ) : (
         <div className="space-y-3">
-          {rooms.map((r) => (
+          {activeRooms.map((r) => (
             <div key={r.id} data-testid={`tk-card-${r.id}`} className="w-full rounded-xl border border-white/10 bg-[#181D22] p-4 hover:border-[#F59E0B]/60 transition-colors flex items-center gap-3">
               <button onClick={() => navigate(`/tiket/${r.id}`)} className="flex-1 min-w-0 text-left">
                 <div className="text-lg font-extrabold">{r.name}</div>
@@ -104,10 +120,31 @@ export default function Tiket() {
                   {r.status && <span className="uppercase text-xs">{r.status}</span>}
                 </div>
               </button>
+              {isAdmin && r.status === "settled" && (
+                <button data-testid={`tk-archive-${r.id}`} onClick={(e) => archive(e, r)} title="Archivia stanza" className="p-2 rounded-md text-[#F59E0B] hover:bg-[#F59E0B]/10 shrink-0"><Archive size={18} /></button>
+              )}
               {isAdmin && (
                 <button data-testid={`tk-delete-${r.id}`} onClick={(e) => remove(e, r)} title="Elimina stanza" className="p-2 rounded-md text-[#EF4444] hover:bg-[#EF4444]/10 shrink-0"><Trash2 size={18} /></button>
               )}
               <ChevronRight className="text-[#F59E0B] shrink-0" size={20} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isAdmin && archivedRooms.length > 0 && (
+        <div className="space-y-3">
+          <button data-testid="tk-archived-toggle" onClick={() => setShowArchived((v) => !v)} className="flex items-center gap-2 text-sm text-[#94A3B8] hover:text-white transition-colors">
+            <Archive size={15} /> Archiviate ({archivedRooms.length}) {showArchived ? "▲" : "▼"}
+          </button>
+          {showArchived && archivedRooms.map((r) => (
+            <div key={r.id} data-testid={`tk-archived-${r.id}`} className="w-full rounded-xl border border-white/5 bg-[#12161A] p-4 flex items-center gap-2 opacity-80">
+              <button onClick={() => navigate(`/tiket/${r.id}`)} className="flex-1 min-w-0 text-left">
+                <span className="font-bold">{r.name}</span>
+                <span className="ml-2 text-xs text-[#94A3B8]">G{r.matchday} · archiviata</span>
+              </button>
+              <button data-testid={`tk-unarchive-${r.id}`} onClick={(e) => unarchive(e, r)} title="Ripristina" className="p-2 rounded-md text-[#00D95F] hover:bg-white/5 shrink-0"><ArchiveRestore size={18} /></button>
+              <button data-testid={`tk-delete-${r.id}`} onClick={(e) => remove(e, r)} title="Elimina" className="p-2 rounded-md text-[#EF4444] hover:bg-white/5 shrink-0"><Trash2 size={18} /></button>
             </div>
           ))}
         </div>

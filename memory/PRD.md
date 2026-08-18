@@ -3,6 +3,13 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Feature — Archivia Torneo/Stanza/Lega (2026-06)
+- L'admin può ARCHIVIARE (invece di eliminare) un elemento CONCLUSO: lo storico resta consultabile ma esce dalla lista attiva → sezione collassabile "Archiviati" (Ripristina + Elimina). Solo admin.
+- Backend: campo `archived` nei dict + endpoint `POST /archive?archived=bool` per ogni gioco. Gate "concluso": Survival/SAL `status=='finished'`, Tiket `status=='settled'`, Fanta `current_matchday!=null`. Unarchive sempre consentito. (`surviva.py`, `scoreandlive.py`, `thebesttiket.py`, `fantagiornata.py`).
+- Frontend (Survival/ScoreAndLive/Tiket/FantaGiornata): split active vs archived su campo `archived`; pulsante Archivia (`{sv|sal|tk|fg}-archive-{id}`) solo su elementi conclusi; toggle `*-archived-toggle`, Ripristina `*-unarchive-{id}`. Survival carica `/sv/tournaments?include_finished=true`.
+- Verified: testing agent iteration_10 backend 8/8 + frontend 7/7, permessi player OK, click non naviga (stopPropagation), 0 dati produzione toccati. Regressione: /app/backend/tests/test_archive_buttons.py.
+
+
 ## Feature — Elimina Tornei/Stanze/Leghe (2026-06)
 - Pulsante Elimina (icona cestino rosso, **solo admin**) su ogni card nelle 4 liste: Survival (`sv-delete-{id}` → DELETE /sv/tournaments/{id}), ScoreAndLive (`sal-delete-{id}` → DELETE /sal/tournaments/{id}?force, con doppia conferma se ci sono giocate storiche/409), Tiket stanze (`tk-delete-{id}` → DELETE /rooms/{id}), FantaGiornata leghe (`fg-delete-{id}` → DELETE /fg/leagues/{id}).
 - Card convertite da `<button>` a `<div>` con button interno per navigazione + button cestino separato (stopPropagation). Endpoint delete già esistenti nel backend (cascade). Verified: testing agent iteration_9 backend 8/8, frontend 100%, permessi player OK, regressione navigazione OK. Test regressione riutilizzabile: /app/backend/tests/test_delete_buttons.py.

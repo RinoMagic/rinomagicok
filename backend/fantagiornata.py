@@ -313,6 +313,7 @@ def build_router(
             "invites_total": invites_total,
             "invites_available": invites_available,
             "is_admin": is_admin,
+            "archived": bool(lg.get("archived", False)),
         }
 
     async def _invite_dict(inv: dict) -> dict:
@@ -444,6 +445,16 @@ def build_router(
         base["members"] = members
         base["current_matchday_number"] = current_md
         return base
+
+    @router.post("/leagues/{league_id}/archive")
+    async def archive_league(league_id: str, archived: bool = True, user: dict = Depends(current_user)):
+        """Archive/unarchive a league that has been played (keeps history, hides from active list)."""
+        lg = await _require_league_admin(league_id, user)
+        if archived and not lg.get("current_matchday"):
+            raise HTTPException(status_code=400, detail="Puoi archiviare solo una lega già giocata (almeno una giornata liquidata)")
+        await db.fg_leagues.update_one({"id": league_id}, {"$set": {"archived": bool(archived)}})
+        lg["archived"] = bool(archived)
+        return await _league_dict(lg, user)
 
     @router.delete("/leagues/{league_id}")
     async def delete_league(league_id: str, user: dict = Depends(current_user)):
