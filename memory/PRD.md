@@ -3,7 +3,13 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
-## Fix — 5 punti recuperati dall'originale (2026-06)
+## Fix — Formato risultato + partite escluse (2026-06)
+- **Login 404**: NON riproducibile in preview (POST /api/auth/admin/login e /player/login → 200, redirect all'Hub OK). deployment_agent: nessun blocco, app deployment-ready. Il 502 transitorio è solo durante il riavvio del backend (startup ~15-18s per creazione indici Atlas).
+- **#1 Formato risultato/pronostico**: mostrava JSON grezzo ({"home_score":2,...}) invece di "2-0". Fix: `Bonus.js` 'Pronostico attuale' usa `fmtPick`; `GestioneBonus.js` 'Risultato' usa `fmtResult`.
+- **#2 Partite escluse ancora giocabili**: `surviva.py::_matchday_dict` ora filtra `excluded`/`postponed_before` dalle fixtures giocabili → le partite escluse spariscono dalla giocata per OGNI giornata non liquidata (la propagazione a sv_matchdays era già presente).
+- Verified: testing agent iteration_14, backend 100% + frontend 100% (exclude→verifica→ripristino). Test: /app/backend/tests/test_bugfix_iter14.py.
+
+
 1. **Banner giocata effettuata** (`TiketRoom.js`): sezione "Partecipanti" con badge verde "Giocata effettuata" (chi ha consegnato la schedina, da `/rooms/{id}/members` campo `submitted`) o "In attesa".
 2. **Avanzamento automatico Survival**: già nel backend (`settle` imposta `current_matchday=next`); confermato (torneo passa a G2 dopo calcolo G1).
 3. **Stato stanza/torneo Open→Concluso**: `matchday_settle` ora imposta `rooms.status='settled'` dopo il calcolo (Betting→Concluso); label "settled"→"Concluso" in `Tiket.js`/`TiketRoom.js`. Survival mostra "Concluso" quando `finished`.

@@ -838,7 +838,10 @@ def build_router(
             "season": md.get("season"),
             "status": md.get("status", "open"),
             "kickoff_first": md.get("kickoff_first"),
-            "fixtures": md.get("fixtures", []),
+            "fixtures": [
+                f for f in md.get("fixtures", [])
+                if not f.get("excluded") and not f.get("postponed_before")
+            ],
             "locked": locked,
             "settled": md.get("status") == "settled",
             "tie_break": bool(md.get("tie_break")),

@@ -107,7 +107,7 @@ export default function Bonus() {
           {subs.map((s) => (
             <div key={s.id} data-testid={`bonus-sub-${s.id}`} className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-2">
               <div className="text-sm font-bold">{s.name || s.room_name || s.tournament_name || "La tua iscrizione"}</div>
-              {s.my_pick && <div className="text-xs text-[#00D95F]">Pronostico attuale: {JSON.stringify(s.my_pick.pick || s.my_pick)}</div>}
+              {s.my_pick && <div className="text-xs text-[#00D95F]">Pronostico attuale: {fmtPick(s.my_pick.pick || s.my_pick)}</div>}
               {active.type === "exact_score" ? (
                 <div className="flex items-center gap-2">
                   <input data-testid={`bonus-home-${s.id}`} type="number" min="0" placeholder="Casa" onChange={(e) => setIn(s.id, { home: e.target.value })} className="w-20 bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-center" />

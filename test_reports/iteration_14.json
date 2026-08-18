@@ -1,0 +1,19 @@
+{
+  "summary": "Verified 2 bugfixes: (#1) score/pick JSON formatting via fmtPick/fmtResult on /bonus + Admin Gestione Bonus, and (#2) excluded fixtures propagate to Survival matchday. Both PASS on backend (pytest) and frontend (Playwright). Regression: admin+player login OK, /bonus renders, no crashes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_bugfix_iter14.py", "/app/test_reports/pytest/iter14_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: /app/backend/scoreandlive.py GET /api/sal/calendar defaults season to '2025-26' while stagione corrente è 2026-27; consider defaulting to current season env or making season required to avoid silent empty responses.",
+    "Minor: React hydration warning observed in console on Gestione Bonus page: '<span> cannot be a child of <option>' — non-blocking but should be fixed for cleanliness."
+  ],
+  "updated_files": ["/app/backend/tests/test_bugfix_iter14.py"],
+  "success_rate": {"backend": "100% (4/4 executed, 2 skipped for missing endpoints)", "frontend": "100% (both bugfixes visually confirmed + admin exclude flow)"},
+  "test_credentials": "Admin e1qa.admin@gmail.com/Test1234! (email login); Player e1_qa_player/Test1234!",
+  "seed_data_creation": "None. Fixture Atalanta-Bologna G2 was temporarily excluded then RESTORED. Final API check confirms 10 fixtures present in Survival G2 (all teams intact).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login endpoints return 'token' (NOT 'access_token'). Calendar endpoint requires season='2026-27' param (default is 2025-26). Bug#1 verified via UI: /bonus page (Survival tab) shows 'Risultato: 2-0' and picks like '1-1', '2-0', '3-1' with no JSON leaks; Admin Gestione Bonus card 'G1 Big Match' Roma-Fiorentina shows 'Risultato: 2-0'. Bug#2 verified via API: PATCH /api/sal/calendar/fixture/{id}/exclude {excluded:true} removes the fixture from GET /api/sv/tournaments/{tid}/matchdays/current fixtures array; restoring flips it back. Backend test file /app/backend/tests/test_bugfix_iter14.py covers both regression logins and the full exclude→verify→restore flow.",
+  "rca of the issue": "N/A — bugs already fixed by main agent. Fix locations confirmed: /app/frontend/src/pages/Bonus.js (fmtPick/fmtResult), /app/frontend/src/components/admin/GestioneBonus.js (fmtResult), /app/backend/surviva.py (_matchday_dict filters excluded+postponed_before), /app/backend/scoreandlive.py (PATCH .../exclude propagates to sv_matchdays snapshots)."
+}

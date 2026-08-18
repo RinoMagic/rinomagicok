@@ -49,6 +49,15 @@ export default function GestioneBonus() {
 
   const setIn = (cid, patch) => setSettleInputs((p) => ({ ...p, [cid]: { ...p[cid], ...patch } }));
 
+  const fmtResult = (r) => {
+    if (r == null) return "—";
+    if (typeof r === "string" || typeof r === "number") return String(r);
+    if (r.home_score != null && r.away_score != null) return `${r.home_score}-${r.away_score}`;
+    if (r.player_name) return r.player_name;
+    if (r.pick) return fmtResult(r.pick);
+    return "—";
+  };
+
   const settle = async (c) => {
     const v = settleInputs[c.id] || {};
     try {
@@ -117,7 +126,7 @@ export default function GestioneBonus() {
                 </div>
               )
             ) : (
-              <div className="text-xs text-[#00D95F]">Risultato: {c.result ? JSON.stringify(c.result) : "—"}</div>
+              <div className="text-xs text-[#00D95F]">Risultato: {fmtResult(c.result)}</div>
             )}
           </div>
         ))}
