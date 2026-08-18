@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3, FileDown } from "lucide-react";
+import { Heart, ChevronLeft, Skull, Lock, Send, Trophy, Copy, BarChart3, FileDown, Gift, ChevronRight, CheckCircle2, Circle } from "lucide-react";
 import { api, apiDownload } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import InvitesManager from "@/components/InvitesManager";
 import NotifyBox from "@/components/NotifyBox";
+import { SurvivaPicksModal } from "@/components/SurvivaPicksModal";
 
 const SIGNS = ["1", "X", "2"];
 
@@ -23,13 +24,14 @@ export default function SurvivalDetail() {
   const [mdList, setMdList] = useState([]);
   const [summaryMd, setSummaryMd] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const tour = await api(`/sv/tournaments/${tid}`);
       setT(tour);
-      const parts = await api(`/sv/tournaments/${tid}/participants`);
+      const parts = await api(`/sv/tournaments/${tid}/leaderboard`);
       setParticipants(parts);
       if (tour.joined) {
         const lk = await api(`/sv/tournaments/${tid}/locked-teams`).catch(() => ({ locked_teams: [], lives_left: 0 }));
@@ -255,20 +257,37 @@ export default function SurvivalDetail() {
 
       <div>
         <h2 className="text-lg font-extrabold mb-2 flex items-center gap-2"><Trophy size={18} className="text-[#F59E0B]" /> Classifica</h2>
+        <p className="text-xs text-[#94A3B8] mb-2">Tocca un giocatore per vedere la sua giocata.</p>
         <div className="rounded-xl border border-white/10 bg-[#181D22] divide-y divide-white/10">
-          {participants.map((p, i) => {
-            const out = p.eliminated_at != null;
+          {participants.map((p) => {
+            const out = p.eliminated;
             return (
-              <div key={p.user_id} data-testid={`svd-part-${p.user_id}`} className="px-4 py-3 flex items-center gap-3">
-                <span className="w-6 text-[#94A3B8] font-bold">{i + 1}</span>
-                {out ? <Skull size={16} className="text-white/40" /> : <Heart size={16} className="text-[#EF4444]" />}
-                <span className={`flex-1 ${out ? "line-through text-white/40" : "font-medium"}`}>{p.nickname}</span>
-                <span className="text-sm font-bold" style={{ color: out ? "#64748B" : "#EF4444" }}>{out ? "Fuori" : `${p.lives_left} ♥`}</span>
-              </div>
+              <button key={p.user_id} data-testid={`sv-lb-row-${p.user_id}`} onClick={() => setSelectedRow(p)} className={`w-full text-left px-3 py-3 flex items-center gap-3 hover:bg-white/5 transition-colors ${out ? "opacity-60" : ""}`}>
+                <span className="w-8 text-[#EF4444] font-extrabold shrink-0">#{p.rank}</span>
+                <div className="flex-1 min-w-0">
+                  <div className={`font-bold truncate ${out ? "line-through" : ""}`}>{p.nickname}</div>
+                  {out ? (
+                    <div className="flex items-center gap-1 text-xs text-[#94A3B8]"><Skull size={12} /> {p.eliminated_matchday ? `Eliminato · G${p.eliminated_matchday}` : "Eliminato"}</div>
+                  ) : (
+                    <div className={`flex items-center gap-1 text-xs ${p.has_submitted_current ? "text-[#00D95F]" : "text-[#F59E0B]"}`}>
+                      {p.has_submitted_current ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+                      {p.has_submitted_current ? "Giocata inserita" : "In attesa di giocata"}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-stretch gap-1 shrink-0">
+                  <span data-testid={`sv-lb-prelives-${p.user_id}`} className="flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-xs font-bold text-[#94A3B8]"><Heart size={11} /> {p.pick_lives}</span>
+                  <span data-testid={`sv-lb-bonus-${p.user_id}`} className="flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-[#F59E0B]/10 border border-[#F59E0B]/50 text-xs font-bold text-[#F59E0B]"><Gift size={11} /> +{p.bonus_wins ?? 0}</span>
+                  <span data-testid={`sv-lb-lives-${p.user_id}`} className="flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-[#EF4444]/10 border border-[#EF4444]/50 text-xs font-extrabold text-[#EF4444]"><Heart size={11} className="fill-[#EF4444]" /> {p.lives_left}</span>
+                </div>
+                <ChevronRight size={18} className="text-[#94A3B8] shrink-0" />
+              </button>
             );
           })}
         </div>
       </div>
+
+      <SurvivaPicksModal tid={tid} row={selectedRow} onClose={() => setSelectedRow(null)} />
     </div>
   );
 }
