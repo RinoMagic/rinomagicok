@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Heart, Plus, ChevronLeft, Ticket } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { BonusBanner } from "@/components/BonusBanner";
 
 export default function Survival() {
   const navigate = useNavigate();
@@ -45,6 +46,8 @@ export default function Survival() {
   return (
     <div className="space-y-5">
       <button data-testid="survival-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
+
+      <BonusBanner game="survival" />
 
       <div className="flex items-end justify-between">
         <div>

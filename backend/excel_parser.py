@@ -390,6 +390,124 @@ def parse_voti_xlsx(
 
 
 # =========================================================================
+# CALENDAR parser (flexible column detection)
+# =========================================================================
+
+_CAL_MD_KEYS = ("giornata", "gg", "turno", "matchday", "md")
+_CAL_HOME_KEYS = ("casa", "home", "squadra casa", "in casa", "padrone")
+_CAL_AWAY_KEYS = ("trasferta", "away", "ospite", "fuori", "squadra trasferta")
+_CAL_DATE_KEYS = ("data", "kickoff", "date", "ora", "giorno")
+
+
+def _find_col(header: tuple, keys) -> Optional[int]:
+    for idx, cell in enumerate(header):
+        if cell is None:
+            continue
+        low = str(cell).strip().lower()
+        for k in keys:
+            if k == low or low.startswith(k) or k in low:
+                return idx
+    return None
+
+
+def parse_calendar_xlsx(xlsx_bytes: bytes) -> Tuple[List[dict], Dict[str, Any]]:
+    """Parse a Serie A calendar ``.xlsx`` into a list of fixtures.
+
+    Flexible header detection — the sheet must contain a header row with
+    columns identifiable as *matchday / home / away* (Italian or English
+    keywords). An optional *date/kickoff* column is picked up when present.
+
+    Expected minimal layout (header names are matched case-insensitively)::
+
+        Giornata | Casa | Trasferta | Data (opzionale)
+        1        | Inter| Torino    | 2026-08-24T18:30
+        ...
+
+    Returns ``(fixtures, diagnostics)`` where each fixture is
+    ``{matchday, home_team, away_team, kickoff_iso}``.
+    """
+    try:
+        import openpyxl  # noqa: WPS433
+    except ImportError as e:  # pragma: no cover
+        raise RuntimeError(f"openpyxl non installato: {e}") from e
+
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True, read_only=True)
+    ws = wb[wb.sheetnames[0]]
+
+    all_rows = list(ws.iter_rows(values_only=True))
+    header_idx = None
+    col_md = col_home = col_away = col_date = None
+    for i, row in enumerate(all_rows[:15]):
+        if not row:
+            continue
+        md = _find_col(row, _CAL_MD_KEYS)
+        home = _find_col(row, _CAL_HOME_KEYS)
+        away = _find_col(row, _CAL_AWAY_KEYS)
+        if md is not None and home is not None and away is not None:
+            header_idx = i
+            col_md, col_home, col_away = md, home, away
+            col_date = _find_col(row, _CAL_DATE_KEYS)
+            break
+
+    if header_idx is None:
+        raise RuntimeError(
+            "Intestazione non riconosciuta. Attese colonne 'Giornata', 'Casa', "
+            "'Trasferta' (e opzionale 'Data')."
+        )
+
+    fixtures: List[dict] = []
+    scanned = 0
+    for row in all_rows[header_idx + 1:]:
+        if not row:
+            continue
+        scanned += 1
+        try:
+            md_raw = row[col_md] if col_md < len(row) else None
+            home_raw = row[col_home] if col_home < len(row) else None
+            away_raw = row[col_away] if col_away < len(row) else None
+        except (IndexError, TypeError):
+            continue
+        if home_raw is None or away_raw is None or md_raw is None:
+            continue
+        try:
+            matchday = int(float(str(md_raw).strip()))
+        except (TypeError, ValueError):
+            continue
+        if not (1 <= matchday <= 38):
+            continue
+        home = _canonicalize_team(str(home_raw)) or str(home_raw).strip()
+        away = _canonicalize_team(str(away_raw)) or str(away_raw).strip()
+        if not home or not away:
+            continue
+        kickoff = None
+        if col_date is not None and col_date < len(row) and row[col_date] is not None:
+            val = row[col_date]
+            if hasattr(val, "isoformat"):
+                kickoff = val.isoformat()
+            else:
+                kickoff = str(val).strip() or None
+        fixtures.append({
+            "matchday": matchday,
+            "home_team": home,
+            "away_team": away,
+            "kickoff_iso": kickoff,
+        })
+
+    by_md: Dict[int, int] = {}
+    for f in fixtures:
+        by_md[f["matchday"]] = by_md.get(f["matchday"], 0) + 1
+    diagnostics = {
+        "sheet_used": ws.title,
+        "rows_scanned": scanned,
+        "extracted": len(fixtures),
+        "matchdays": sorted(by_md.keys()),
+    }
+    return fixtures, diagnostics
+
+
+
+
+# =========================================================================
 # CLI smoke test (usage: python -m excel_parser voti.xlsx)
 # =========================================================================
 

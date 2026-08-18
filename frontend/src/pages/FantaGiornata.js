@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ChevronLeft, Plus, Users, Shirt } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { BonusBanner } from "@/components/BonusBanner";
 
 export default function FantaGiornata() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function FantaGiornata() {
   return (
     <div className="space-y-5">
       <button data-testid="fg-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
+      <BonusBanner game="fanta" />
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-[#A855F7]">FantaGiornata</h1>

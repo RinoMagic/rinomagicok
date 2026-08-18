@@ -1,0 +1,42 @@
+{
+  "summary": "Verified 9-tool Admin Panel restoration and BonusBanner integration. Backend pytest suite (test_admin_tools.py) 10/10 passed. UI smoke via Playwright confirmed: admin login works, /admin shows all 9 tool cards (data-testid admin-tool-*), navigation into each tool works, and non-destructive interactions succeed. Bonus banner appears on 3/4 game pages for QA player (survival not shown = user not eligible / no active bonus for survival, which is expected).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "GestioneBonus / gb-bigmatch <select>", "issues": ["React hydration warning: <span> cannot be child of <option>. Caused by dev instrumentation wrappers (x-source-var / x-excluded span) injected around option's dynamic text. Only visible in dev build; produces console error. Consider ejecting/disabling that instrumentation on <option> elements or wrapping text differently."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_admin_tools.py",
+    "/app/test_reports/pytest/admin_tools.xml"
+  ],
+  "verified_functionality": [
+    "Admin login (email) -> /admin loads menu with 9 STRUMENTI ADMIN cards (calcola, escludi, calendario, deadline, lista, bonus, admin, notifiche, utenti)",
+    "admin-tool-back returns to menu",
+    "EscludiPartite: giornata=1 lista 10 partite; ep-toggle-<id> escludi/reintegra funziona (toggled twice on Atalanta-Sassuolo, restored to original state)",
+    "DeadlineGiornate: G2, G38 mostrate; PUT su giornata 5 persiste (verificato lato API e UI). Datetime picker (type=datetime-local) presente e funzionante",
+    "CalendarioSerieA: cal-listmd=1 + cal-list mostra 10 fixtures; bottoni 'Anteprima da PDF' e 'Anteprima da Excel' presenti (cal-pdf, cal-xlsx input file)",
+    "ListaCalciatori: bottoni Anteprima da PDF/Excel presenti",
+    "GestioneBonus: 4 bonus configurati caricati; selezionando gb-type=exact_score e gb-md=1 il dropdown gb-bigmatch si popola con 10 partite del calendario (11 options incluso placeholder)",
+    "GestioneAdmin: form ga-email / ga-temppw / ga-promote presente; lista admins renderizzata (data-testid effettivo per righe è ga-admin-<id>, non ga-user-<id>)",
+    "Notifiche: nt-reminder-1440 toggle presente; form broadcast nt-title/nt-body/nt-send presente",
+    "GestioneUtenti: 12 utenti listati con badge ADMIN visibili",
+    "BonusBanner: appare su /tiket, /scoreandlive, /fanta per QA player. Non appare su /survival (player non iscritto a tornei survival = non idoneo, comportamento previsto)"
+  ],
+  "critical_code_review_comments": [
+    "BonusBanner testid semantics differ from request wording: banner uses game prop values 'tiket','survival','score','fanta' (matching backend /api/bonus/available game=... regex), producing testids bonus-banner-tiket / bonus-banner-score / bonus-banner-fanta / bonus-banner-survival. Request mentioned 'bonus-banner-{game}' referencing route names (survival/tiket/scoreandlive/fanta) — actual naming is consistent with backend game codes; not a bug.",
+    "GestioneAdmin lists admins with data-testid ga-admin-<id> (delete btn ga-del-<id>), while task description mentioned ga-user-* — actual naming is fine and consistent within the component.",
+    "DeadlineGiornate row testid is dl-row-<md>, not dl-list. Actual naming is per-row (better) and works correctly.",
+    "Dev-mode source-instrumentation adds a nested <span> inside <option> in GestioneBonus.js:86 causing a React hydration console warning. Not a functional bug but noisy in DevTools. Safe to ignore in prod build; consider stripping instrumentation on <option> children."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_tools.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% of tools reachable & data loads"},
+  "test_credentials": "Admin e1qa.admin@gmail.com / Test1234! ; Player e1_qa_player / Test1234! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "PUT /api/deadlines/5 con deadline_at=2027-05-10T18:00:00Z (giornata di test, non dato di produzione). Nessuna scrittura distruttiva su fixtures/bonus/utenti/admin reali.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 9 admin tools are wired up correctly and non-destructive flows verified end-to-end via pytest + Playwright. Destructive flows (settle-matchday commit, cal-confirm, ga-del, gu-del/reset/block, nt-send broadcast, bonus settle/del) were intentionally NOT executed to preserve production data. If future iterations need to test them, use isolated seed data (TEST_ prefix) or a staging DB.",
+  "rca of the issue": "N/A — no functional issues found."
+}

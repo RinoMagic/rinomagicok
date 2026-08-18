@@ -1489,6 +1489,79 @@ def build_router(
         result["stored_total"] = await db.sal_calendar.count_documents({"season": season})
         return result
 
+    @router.post("/calendar/import-xlsx")
+    async def import_calendar_xlsx(
+        file: UploadFile = File(...),
+        season: str = "2026-27",
+        dry_run: bool = True,
+        replace: bool = True,
+        user: dict = Depends(require_admin),
+    ):
+        """Upload the season calendar as an **XLSX** and populate ``sal_calendar``.
+
+        Flexible header detection (columns: Giornata / Casa / Trasferta,
+        optional Data). Same dry-run/commit contract as ``import-pdf``.
+        """
+        if not file.filename or not file.filename.lower().endswith(".xlsx"):
+            raise HTTPException(status_code=400, detail="Serve un file .xlsx")
+        raw = await file.read()
+        if len(raw) > 20 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="XLSX troppo grande (max 20MB)")
+
+        from excel_parser import parse_calendar_xlsx  # local import → light startup
+        try:
+            fixtures, diag = parse_calendar_xlsx(raw)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("Calendar XLSX parse error")
+            raise HTTPException(status_code=400, detail=f"Errore nell'analisi dell'XLSX: {e}")
+
+        if not fixtures:
+            raise HTTPException(
+                status_code=400,
+                detail="Nessuna partita riconosciuta nell'XLSX. Verifica le colonne (Giornata, Casa, Trasferta).",
+            )
+
+        by_md: Dict[int, int] = {}
+        for f in fixtures:
+            by_md[f["matchday"]] = by_md.get(f["matchday"], 0) + 1
+        result: Dict[str, Any] = {
+            "season": season,
+            "extracted": len(fixtures),
+            "matchdays": sorted(by_md.keys()),
+            "counts_by_matchday": dict(sorted(by_md.items())),
+            "sample": fixtures[:20],
+            "dry_run": dry_run,
+        }
+        if dry_run:
+            return result
+
+        if replace:
+            await db.sal_calendar.delete_many({"season": season})
+        now = _now()
+        docs = []
+        seen = set()
+        for fx in fixtures:
+            key = (season, fx["matchday"], fx["home_team"].lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            docs.append({
+                "id": str(uuid.uuid4()),
+                "season": season,
+                "matchday": fx["matchday"],
+                "home_team": fx["home_team"],
+                "away_team": fx["away_team"],
+                "kickoff_iso": fx.get("kickoff_iso"),
+                "imported_at": now,
+            })
+        if docs:
+            await db.sal_calendar.insert_many(docs)
+        result["inserted"] = len(docs)
+        result["stored_total"] = await db.sal_calendar.count_documents({"season": season})
+        return result
+
     @router.get("/calendar")
     async def list_calendar(
         season: str = "2025-26",

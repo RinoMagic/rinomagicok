@@ -3,6 +3,25 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Implemented — iteration 8 (2026-06) — Ripristino STRUMENTI ADMIN
+- Pannello Admin ricostruito come menu a card "STRUMENTI ADMIN" (come l'originale) con 9 strumenti in `/app/frontend/src/pages/Admin.js` (stato `tool`, componenti in `/app/frontend/src/components/admin/`):
+  1. **Calcola Giornata** — upload Excel voti (`/admin/voti/upload-xlsx` dry_run→commit), anteprima risultati modificabile + rinvii, conferma → `POST /admin/settle-matchday/preview|commit` (liquida tutti i giochi in un colpo, con `fixture_overrides`, `postponed_matches`, primo marcatore).
+  2. **Escludi Partite** — `GET /sal/calendar` + `PATCH /sal/calendar/fixture/{id}/exclude` (+ delete rinvii).
+  3. **Calendario Serie A** — upload PDF (`/sal/calendar/import-pdf`) o **Excel (nuovo** `/sal/calendar/import-xlsx` + `parse_calendar_xlsx` in excel_parser.py: colonne Giornata/Casa/Trasferta/Data), anteprima+conferma, inserimento/eliminazione manuale.
+  4. **Deadline Giornate** — `PUT /deadlines/{md}?season=` con datetime picker (calendario+orologio) + lista scadenze.
+  5. **Lista Calciatori** — upload Listone PDF/XLSX (`/sal/players/import-pdf|import-xlsx`) con anteprima+conferma.
+  6. **Gestione Giochi Bonus** — `GET/POST /bonus/configs`, Big Match da dropdown calendario, settle exact/scorer, delete.
+  7. **Gestione Admin** — `POST /auth/admin/promote`, `DELETE /auth/users/{id}`.
+  8. **Notifiche** — broadcast + promemoria automatici.
+  9. **Gestione Utenti** — blocca/sblocca/reset/elimina.
+- **Banner Bonus** (`/app/frontend/src/components/BonusBanner.js`) in Survival/Tiket/ScoreAndLive/FantaGiornata: se idoneo e bonus attivo non giocato mostra CTA verde → `/bonus`.
+- Costante stagione centralizzata: `/app/frontend/src/lib/constants.js` (SEASON=2026-27).
+- Verified: testing agent iteration_8 — backend 10/10, tutti e 9 gli strumenti raggiungibili e dati caricati; banner su 3/4 giochi (survival non idoneo per il player QA = corretto). Nessun bug funzionale (solo warning dev innocuo su `<span>` in `<option>`).
+
+## Login bugfix (2026-06)
+- Corretto bug puntini password invisibili (`bg-white/8` renderizzato bianco pieno → testo bianco su bianco): valori `rgba()` espliciti + safeguard `-webkit-autofill`. Aggiunto toggle mostra/nascondi password (icona occhio).
+
+
 ## Approach (this iteration)
 - The GitHub repo was made public; the ORIGINAL FastAPI backend (server.py + auth.py + thebesttiket.py + surviva.py + scoreandlive.py + fantagiornata.py + bonus.py + deadlines.py + matchday_facts.py + matchday_settle.py + web_push.py + schedina_vision.py + excel_parser.py + email_service.py) was copied into /app/backend and runs as-is against Atlas.
 - Startup index creation made best-effort (existing prod indexes differ) to avoid crashes; NO data modified.

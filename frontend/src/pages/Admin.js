@@ -1,215 +1,71 @@
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { ChevronLeft, Clock, Bell, FileText, Gavel, Users, Lock, Unlock, KeyRound } from "lucide-react";
-import { api, apiUpload } from "@/lib/api";
+import { ChevronLeft, ChevronRight, Calculator, Ban, CalendarDays, Clock, Users, Gift, ShieldCheck, Bell, UserCog } from "lucide-react";
+import { SEASON } from "@/lib/constants";
+import CalcolaGiornata from "@/components/admin/CalcolaGiornata";
+import EscludiPartite from "@/components/admin/EscludiPartite";
+import CalendarioSerieA from "@/components/admin/CalendarioSerieA";
+import DeadlineGiornate from "@/components/admin/DeadlineGiornate";
+import ListaCalciatori from "@/components/admin/ListaCalciatori";
+import GestioneBonus from "@/components/admin/GestioneBonus";
+import GestioneAdmin from "@/components/admin/GestioneAdmin";
+import Notifiche from "@/components/admin/Notifiche";
+import GestioneUtenti from "@/components/admin/GestioneUtenti";
 
-const SEASON = "2026-27";
+const TOOLS = [
+  { id: "calcola", title: "Calcola Giornata", desc: "Carica Excel voti e liquida tutti i giochi in un solo passaggio", icon: Calculator, color: "#10B981", C: CalcolaGiornata },
+  { id: "escludi", title: "Escludi Partite", desc: "Escludi partite pre-turno · gestione rinvii · sparisce da tutti i giochi", icon: Ban, color: "#EF4444", C: EscludiPartite },
+  { id: "calendario", title: "Calendario Serie A", desc: "Carica il PDF/Excel del calendario o inserisci le partite manualmente", icon: CalendarDays, color: "#3B82F6", C: CalendarioSerieA },
+  { id: "deadline", title: "Deadline Giornate", desc: "Timer di chiusura pronostici · vale per tutti i giochi", icon: Clock, color: "#F59E0B", C: DeadlineGiornate },
+  { id: "lista", title: "Lista Calciatori", desc: "Carica il Listone Fantacalcio (PDF/Excel) — richiesto per picks e settlement", icon: Users, color: "#8B5CF6", C: ListaCalciatori },
+  { id: "bonus", title: "Gestione Giochi Bonus", desc: "Configura Big Match, primo marcatore e liquida i premi", icon: Gift, color: "#F59E0B", C: GestioneBonus },
+  { id: "admin", title: "Gestione Admin", desc: "Crea o rimuovi altri amministratori", icon: ShieldCheck, color: "#EC4899", C: GestioneAdmin },
+  { id: "notifiche", title: "Notifiche", desc: "Invia notifiche push e configura i promemoria automatici", icon: Bell, color: "#F59E0B", C: Notifiche },
+  { id: "utenti", title: "Gestione Utenti", desc: "Blocca, resetta la password o elimina i giocatori", icon: UserCog, color: "#22D3EE", C: GestioneUtenti },
+];
 
 export default function Admin() {
   const navigate = useNavigate();
-  const [md, setMd] = useState(1);
-  const [deadline, setDeadline] = useState("");
-  const [current, setCurrent] = useState(null);
-  const [title, setTitle] = useState("");
-  const [bodyMsg, setBodyMsg] = useState("");
-  const [settleState, setSettleState] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const pdfRef = useRef(null);
-  const xlsxRef = useRef(null);
-  const [users, setUsers] = useState([]);
-
-  const loadUsers = () => api("/auth/users").then(setUsers).catch((e) => toast.error(e.message));
-  useEffect(() => { loadUsers(); }, []);
-
-  const [reminderOffsets, setReminderOffsets] = useState([]);
-  useEffect(() => { api("/settings/reminders").then((r) => setReminderOffsets(r.offsets_minutes || [])).catch(() => {}); }, []);
-  const toggleOffset = (m) => setReminderOffsets((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m]);
-  const saveReminders = async () => {
-    try { const r = await api("/settings/reminders", { method: "PUT", body: { offsets_minutes: reminderOffsets } }); setReminderOffsets(r.offsets_minutes || []); toast.success("Promemoria salvati"); }
-    catch (e) { toast.error(e.message); }
-  };
-
-  const toggleBlock = async (u) => {
-    try {
-      await api(`/auth/users/${u.id}/${u.blocked ? "unblock" : "block"}`, { method: "POST" });
-      toast.success(u.blocked ? "Sbloccato" : "Bloccato");
-      loadUsers();
-    } catch (e) { toast.error(e.message); }
-  };
-  const resetPw = async (u) => {
-    const pw = window.prompt(`Nuova password per ${u.username || u.email} (min 8 caratteri):`);
-    if (!pw) return;
-    if (pw.length < 8) { toast.error("Minimo 8 caratteri"); return; }
-    try {
-      await api("/auth/users/reset-password", { method: "POST", body: { user_id: u.id, new_password: pw } });
-      toast.success("Password reimpostata");
-    } catch (e) { toast.error(e.message); }
-  };
-
-  const loadCurrent = () => api("/deadlines/current", { }).then(setCurrent).catch(() => {});
-  useEffect(() => { loadCurrent(); }, []);
-
-  const saveDeadline = async () => {
-    try {
-      const iso = deadline ? new Date(deadline).toISOString() : null;
-      await api(`/deadlines/${md}`, { method: "PUT", body: { deadline_at: iso } });
-      toast.success(`Scadenza giornata ${md} salvata`);
-      loadCurrent();
-    } catch (e) { toast.error(e.message); }
-  };
-
-  const broadcast = async () => {
-    try {
-      const r = await api("/push/broadcast", { method: "POST", body: { title, body: bodyMsg, url: "/" } });
-      toast.success(`Inviata a ${r.sent ?? 0} dispositivi`);
-      setTitle(""); setBodyMsg("");
-    } catch (e) { toast.error(e.message); }
-  };
-
-  const [votiPreview, setVotiPreview] = useState(null);
-  const previewVoti = async (ref, path) => {
-    const f = ref.current?.files?.[0];
-    if (!f) return;
-    setBusy(true);
-    try {
-      const r = await apiUpload(path, f, { dry_run: true });
-      setVotiPreview({ rows: r.rows || [], matchday: r.matchday, players: r.players, path, file: f });
-      toast.success(`Anteprima: ${r.players} giocatori · giornata ${r.matchday}`);
-    } catch (e) { toast.error(e.message); }
-    finally { setBusy(false); if (ref.current) ref.current.value = ""; }
-  };
-  const confirmVoti = async () => {
-    if (!votiPreview) return;
-    setBusy(true);
-    try {
-      await apiUpload(votiPreview.path, votiPreview.file, { dry_run: false, replace: true });
-      toast.success(`Voti giornata ${votiPreview.matchday} salvati`);
-      setVotiPreview(null);
-    } catch (e) { toast.error(e.message); }
-    finally { setBusy(false); }
-  };
-
-  const loadSettleState = async () => {
-    try { setSettleState(await api(`/admin/settle-matchday/state?matchday=${md}&season=${SEASON}`)); }
-    catch (e) { toast.error(e.message); }
-  };
-  const commitSettle = async () => {
-    if (!window.confirm(`Liquidare la giornata ${md}? L'operazione aggiorna vite, punti e classifiche.`)) return;
-    try {
-      const r = await api("/admin/settle-matchday/commit", { method: "POST", body: { matchday: Number(md), season: SEASON } });
-      toast.success("Giornata liquidata!");
-      console.log(r);
-      loadSettleState();
-    } catch (e) { toast.error(e.message); }
-  };
-
-  const Card = ({ icon: Icon, title: t, children }) => (
-    <div className="rounded-xl border border-white/10 bg-[#181D22] p-4 space-y-3">
-      <div className="font-bold flex items-center gap-2"><Icon size={18} className="text-[#F59E0B]" /> {t}</div>
-      {children}
-    </div>
-  );
+  const [tool, setTool] = useState(null);
+  const active = TOOLS.find((t) => t.id === tool);
 
   return (
     <div className="space-y-5">
-      <button data-testid="admin-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
-      <h1 className="text-2xl font-extrabold">Pannello Admin</h1>
-
-      <div className="rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/5 p-4">
-        <label className="text-xs text-[#94A3B8]">Giornata di lavoro (stagione {SEASON})</label>
-        <input data-testid="admin-md" type="number" min="1" max="38" value={md} onChange={(e) => setMd(e.target.value)} className="mt-1 w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2" />
-        {current && <p className="text-xs text-[#94A3B8] mt-2">Giornata corrente rilevata: {current.current_matchday ?? current.matchday ?? "-"}</p>}
-      </div>
-
-      <Card icon={Clock} title="Scadenze giornata">
-        <input data-testid="admin-deadline" type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm" />
-        <button data-testid="admin-deadline-save" onClick={saveDeadline} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2">Salva scadenza G{md}</button>
-      </Card>
-
-      <Card icon={Bell} title="Notifica broadcast">
-        <input data-testid="admin-bc-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo" className="w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm" />
-        <input data-testid="admin-bc-body" value={bodyMsg} onChange={(e) => setBodyMsg(e.target.value)} placeholder="Messaggio" className="w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm" />
-        <button data-testid="admin-bc-send" onClick={broadcast} disabled={!title || !bodyMsg} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2 disabled:opacity-50">Invia a tutti</button>
-      </Card>
-
-      <Card icon={Bell} title="Promemoria automatici prima della scadenza">
-        <p className="text-xs text-[#94A3B8]">Scegli quando avvisare automaticamente i partecipanti prima della chiusura dei pronostici.</p>
-        <div className="flex flex-wrap gap-2">
-          {[[1440, "24 ore"], [720, "12 ore"], [360, "6 ore"], [180, "3 ore"], [60, "1 ora"], [30, "30 min"]].map(([m, l]) => {
-            const on = reminderOffsets.includes(m);
-            return (
-              <button key={m} data-testid={`reminder-${m}`} onClick={() => toggleOffset(m)} className={`px-3 py-1.5 rounded-md text-sm font-bold border transition-colors ${on ? "bg-[#F59E0B] text-[#1A1000] border-[#F59E0B]" : "bg-[#0F1216] text-[#94A3B8] border-white/15"}`}>{l}</button>
-            );
-          })}
-        </div>
-        <button data-testid="reminder-save" onClick={saveReminders} className="bg-[#F59E0B] text-[#1A1000] font-bold text-sm rounded-md px-4 py-2 w-fit">Salva promemoria</button>
-      </Card>
-
-      <Card icon={FileText} title="Import Voti (PDF / Excel) — con anteprima">
-        <div className="flex gap-2 flex-wrap">
-          <input ref={pdfRef} data-testid="admin-pdf" type="file" accept="application/pdf" onChange={() => previewVoti(pdfRef, "/admin/voti/upload-pdf")} className="hidden" />
-          <button onClick={() => pdfRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Anteprima da PDF</button>
-          <input ref={xlsxRef} data-testid="admin-xlsx" type="file" accept=".xlsx" onChange={() => previewVoti(xlsxRef, "/admin/voti/upload-xlsx")} className="hidden" />
-          <button onClick={() => xlsxRef.current?.click()} disabled={busy} className="border border-white/15 rounded-md px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-50">Anteprima da Excel</button>
-        </div>
-        {votiPreview && (
-          <div className="mt-2 space-y-2">
-            <div className="text-sm text-[#94A3B8]">Giornata <b className="text-white">{votiPreview.matchday}</b> · {votiPreview.players} giocatori rilevati. Controlla e conferma.</div>
-            <div className="rounded-lg bg-[#0F1216] border border-white/10 max-h-72 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-[#94A3B8] sticky top-0 bg-[#0F1216]">
-                  <tr><th className="text-left px-3 py-2">Giocatore</th><th className="text-left px-3 py-2">Squadra</th><th className="px-2 py-2">R</th><th className="px-2 py-2">Voto</th><th className="px-2 py-2">Gol</th></tr>
-                </thead>
-                <tbody>
-                  {votiPreview.rows.map((r, i) => (
-                    <tr key={i} data-testid={`voti-row-${i}`} className="border-t border-white/5">
-                      <td className="px-3 py-1.5">{r.player_name}</td>
-                      <td className="px-3 py-1.5 text-[#94A3B8]">{r.team}</td>
-                      <td className="px-2 py-1.5 text-center">{r.role}</td>
-                      <td className="px-2 py-1.5 text-center font-bold text-[#F59E0B]">{r.sv ? "s.v." : r.voto}</td>
-                      <td className="px-2 py-1.5 text-center">{r.total_goals || ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {active ? (
+        <>
+          <button data-testid="admin-tool-back" onClick={() => setTool(null)} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Strumenti Admin</button>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${active.color}22` }}>
+              <active.icon size={22} style={{ color: active.color }} />
             </div>
-            <div className="flex gap-2">
-              <button data-testid="voti-confirm" onClick={confirmVoti} disabled={busy} className="bg-[#00D95F] text-[#08110A] font-bold text-sm rounded-md px-4 py-2 disabled:opacity-50">Conferma e salva</button>
-              <button data-testid="voti-cancel" onClick={() => setVotiPreview(null)} className="border border-white/15 rounded-md px-4 py-2 text-sm">Annulla</button>
-            </div>
+            <h1 className="text-2xl font-extrabold">{active.title}</h1>
           </div>
-        )}
-      </Card>
-
-      <Card icon={Gavel} title="Liquidazione risultati">
-        <div className="flex gap-2">
-          <button data-testid="admin-settle-state" onClick={loadSettleState} className="border border-white/15 rounded-md px-4 py-2 text-sm">Verifica stato G{md}</button>
-          <button data-testid="admin-settle-commit" onClick={commitSettle} className="bg-[#EF4444] text-white font-bold text-sm rounded-md px-4 py-2">Liquida G{md}</button>
-        </div>
-        {settleState && (
-          <pre className="text-xs bg-[#0F1216] rounded-md p-3 overflow-auto max-h-40 text-[#94A3B8]">{JSON.stringify(settleState, null, 2)}</pre>
-        )}
-      </Card>
-      <Card icon={Users} title={`Gestione utenti (${users.length})`}>
-        <div className="rounded-lg bg-[#0F1216] border border-white/10 divide-y divide-white/10 max-h-96 overflow-y-auto">
-          {users.map((u) => (
-            <div key={u.id} data-testid={`admin-user-${u.id}`} className="px-3 py-2.5 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate flex items-center gap-2">
-                  {u.username || u.email}
-                  {u.role === "admin" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B]">ADMIN</span>}
-                  {u.blocked && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#EF4444]/20 text-[#EF4444]">BLOCCATO</span>}
+          <active.C />
+        </>
+      ) : (
+        <>
+          <button data-testid="admin-back" onClick={() => navigate("/")} className="flex items-center gap-1 text-[#94A3B8] hover:text-white text-sm transition-colors"><ChevronLeft size={16} /> Hub</button>
+          <div>
+            <h1 className="text-2xl font-extrabold">Pannello Admin</h1>
+            <p className="text-[#94A3B8] text-sm">Stagione {SEASON}</p>
+          </div>
+          <div className="text-xs uppercase tracking-widest text-[#94A3B8] font-bold pt-1">Strumenti Admin</div>
+          <div className="space-y-3">
+            {TOOLS.map((t) => (
+              <button key={t.id} data-testid={`admin-tool-${t.id}`} onClick={() => setTool(t.id)} className="w-full text-left rounded-xl border border-white/10 bg-[#181D22] p-4 flex items-center gap-4 hover:border-white/25 transition-colors">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${t.color}22` }}>
+                  <t.icon size={24} style={{ color: t.color }} />
                 </div>
-              </div>
-              <button data-testid={`admin-user-reset-${u.id}`} onClick={() => resetPw(u)} title="Reset password" className="p-1.5 text-[#94A3B8] hover:text-white"><KeyRound size={16} /></button>
-              <button data-testid={`admin-user-block-${u.id}`} onClick={() => toggleBlock(u)} title={u.blocked ? "Sblocca" : "Blocca"} className={`p-1.5 ${u.blocked ? "text-[#00D95F]" : "text-[#EF4444]"} hover:brightness-125`}>
-                {u.blocked ? <Unlock size={16} /> : <Lock size={16} />}
+                <div className="flex-1 min-w-0">
+                  <div className="font-extrabold">{t.title}</div>
+                  <div className="text-sm text-[#94A3B8]">{t.desc}</div>
+                </div>
+                <ChevronRight size={20} className="text-[#94A3B8] shrink-0" />
               </button>
-            </div>
-          ))}
-        </div>
-      </Card>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
