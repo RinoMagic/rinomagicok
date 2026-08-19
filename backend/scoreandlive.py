@@ -691,8 +691,7 @@ def build_router(
         md_docs = []
         for md_num in range(start_matchday, 39):
             cal_rows = [r async for r in db.sal_calendar.find(
-                {"season": season, "matchday": md_num,
-                 "excluded": {"$ne": True}}, {"_id": 0}
+                {"season": season, "matchday": md_num}, {"_id": 0}
             ).sort("home_team", 1)]
             if not cal_rows:
                 continue
@@ -1268,8 +1267,7 @@ def build_router(
         provided = list(data.fixtures or [])
         if not provided:
             cal_rows = [r async for r in db.sal_calendar.find(
-                {"season": season, "matchday": data.matchday_number,
-                 "excluded": {"$ne": True}}, {"_id": 0}
+                {"season": season, "matchday": data.matchday_number}, {"_id": 0}
             ).sort("home_team", 1)]
             if not cal_rows:
                 raise HTTPException(
@@ -1683,6 +1681,11 @@ def build_router(
         matchday in all games (Survival, ScoreAndLive, TheBestTiket) so the
         deleted match instantly disappears from the playable fixtures and is
         neutralised (quota 1.00) on Tiket schedine.
+
+        SOFT delete: the master calendar row is KEPT (only marked ``excluded``)
+        so it is NEVER lost — a future NEW tournament/room will still seed the
+        full original calendar. The removal only affects the tournaments/rooms
+        that already existed (via snapshot propagation).
         """
         fx = await db.sal_calendar.find_one({"id": fixture_id}, {"_id": 0})
         if not fx:
@@ -1690,8 +1693,10 @@ def build_router(
         propagated = await _propagate_fixture_exclusion(
             fx.get("home_team"), fx.get("away_team"), fx.get("matchday"), True,
         )
-        await db.sal_calendar.delete_one({"id": fixture_id})
-        return {"deleted": True, "propagated": propagated}
+        await db.sal_calendar.update_one(
+            {"id": fixture_id}, {"$set": {"excluded": True}},
+        )
+        return {"deleted": True, "soft": True, "propagated": propagated}
 
     @router.put("/calendar/fixture/{fixture_id}")
     async def update_calendar_fixture(

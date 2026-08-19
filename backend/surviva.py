@@ -280,11 +280,13 @@ def build_router(
     async def _fixtures_for_matchday(season: str, matchday: int) -> List[dict]:
         """Read the fixtures list from the shared ``sal_calendar`` collection.
 
-        Fixtures with ``excluded=True`` (admin excluded pre-round) are
-        skipped so users can never select them.
+        NB: a NEW tournament ALWAYS seeds the FULL original calendar for the
+        matchday — the ``excluded`` flag is intentionally IGNORED here.
+        Exclusions/removals only affect the tournaments/rooms that already
+        existed when the admin performed them (via snapshot propagation).
         """
         cursor = db.sal_calendar.find(
-            {"season": season, "matchday": matchday, "excluded": {"$ne": True}},
+            {"season": season, "matchday": matchday},
             {"_id": 0, "home_team": 1, "away_team": 1, "kickoff_iso": 1},
         )
         return [f async for f in cursor]
@@ -797,14 +799,16 @@ def build_router(
 
     async def _valid_calendar_keys(season, matchday) -> set:
         """Set of (home,away) fixtures that CURRENTLY exist in the season
-        calendar and are NOT excluded. Used to filter playable fixtures live,
-        so a match deleted/excluded from the calendar disappears from the
-        pick screen even if an old matchday snapshot still references it."""
+        calendar. Used only to drop true ORPHANS from an existing snapshot
+        (a fixture no longer present in the master calendar). The ``excluded``
+        flag is NOT considered here: exclusions are enforced per-instance via
+        the snapshot's own ``excluded``/``postponed_before`` flags, so that a
+        NEW tournament can still load the full original calendar."""
         keys: set = set()
         if not season or matchday is None:
             return keys
         async for cf in db.sal_calendar.find(
-            {"season": season, "matchday": matchday, "excluded": {"$ne": True}},
+            {"season": season, "matchday": matchday},
             {"_id": 0, "home_team": 1, "away_team": 1},
         ):
             keys.add(((cf.get("home_team") or "").strip().lower(),
@@ -936,7 +940,7 @@ def build_router(
         # sal_calendar query per matchday inside _matchday_dict.
         cal_by_md: Dict[int, set] = {}
         async for cf in db.sal_calendar.find(
-            {"season": season, "excluded": {"$ne": True}},
+            {"season": season},
             {"_id": 0, "matchday": 1, "home_team": 1, "away_team": 1},
         ):
             cal_by_md.setdefault(int(cf["matchday"]), set()).add(
@@ -1073,7 +1077,7 @@ def build_router(
         # matches are filtered out of preview defaults too).
         cal_by_md: Dict[int, set] = {}
         async for cf in db.sal_calendar.find(
-            {"season": season, "excluded": {"$ne": True}},
+            {"season": season},
             {"_id": 0, "matchday": 1, "home_team": 1, "away_team": 1},
         ):
             cal_by_md.setdefault(int(cf["matchday"]), set()).add(
