@@ -271,6 +271,19 @@ def build_router(
             raise HTTPException(status_code=403, detail="Non sei iscritto a questo torneo")
         return p
 
+    async def _assert_access(tid: str, user: dict) -> dict:
+        """Entry is invite-only: only a global admin, the tournament admin, or
+        a joined participant may access a tournament. Everyone else → 403."""
+        t = await _get_tournament(tid)
+        if user.get("role") == "admin" or user["id"] == t.get("admin_user_id"):
+            return t
+        if await _get_participant(tid, user["id"]):
+            return t
+        raise HTTPException(
+            status_code=403,
+            detail="Accesso riservato: entra con un codice invito valido",
+        )
+
     async def _require_tournament_admin(tid: str, user: dict) -> dict:
         t = await _get_tournament(tid)
         if user["role"] != "admin" and user["id"] != t.get("admin_user_id"):
@@ -557,6 +570,12 @@ def build_router(
         q: dict = {}
         if not include_finished:
             q["status"] = {"$ne": "finished"}
+        # Invite-only: non-admins see ONLY tournaments they have joined.
+        if user.get("role") != "admin":
+            joined_ids = [p["tournament_id"] async for p in db.sv_participants.find(
+                {"user_id": user["id"]}, {"_id": 0, "tournament_id": 1},
+            )]
+            q["id"] = {"$in": joined_ids}
         cursor = db.sv_tournaments.find(q, {"_id": 0}).sort("created_at", -1)
         out = []
         async for t in cursor:
@@ -565,10 +584,15 @@ def build_router(
 
     @router.get("/tournaments/history")
     async def tournaments_history(user: dict = Depends(current_user)):
-        """Finished tournaments — always visible to everyone (public archive)."""
-        cursor = db.sv_tournaments.find(
-            {"status": "finished"}, {"_id": 0},
-        ).sort("finished_at", -1)
+        """Finished tournaments — invite-only: a non-admin sees only the ones
+        they participated in."""
+        q: dict = {"status": "finished"}
+        if user.get("role") != "admin":
+            joined_ids = [p["tournament_id"] async for p in db.sv_participants.find(
+                {"user_id": user["id"]}, {"_id": 0, "tournament_id": 1},
+            )]
+            q["id"] = {"$in": joined_ids}
+        cursor = db.sv_tournaments.find(q, {"_id": 0}).sort("finished_at", -1)
         out = []
         async for t in cursor:
             out.append(await _tournament_dict(t, user))
@@ -576,7 +600,7 @@ def build_router(
 
     @router.get("/tournaments/{tid}")
     async def get_tournament(tid: str, user: dict = Depends(current_user)):
-        t = await _get_tournament(tid)
+        t = await _assert_access(tid, user)
         return await _tournament_dict(t, user)
 
     # ------------------------------------------------------------------
@@ -760,7 +784,7 @@ def build_router(
 
     @router.get("/tournaments/{tid}/participants")
     async def list_participants(tid: str, user: dict = Depends(current_user)):
-        await _get_tournament(tid)
+        await _assert_access(tid, user)
         cursor = db.sv_participants.find({"tournament_id": tid}, {"_id": 0})
         rows = []
         async for p in cursor:
@@ -934,7 +958,7 @@ def build_router(
 
     @router.get("/tournaments/{tid}/matchdays")
     async def list_matchdays(tid: str, user: dict = Depends(current_user)):
-        t = await _get_tournament(tid)
+        t = await _assert_access(tid, user)
         season = t.get("season")
         # Batch-load calendar keys once, grouped by matchday, to avoid one
         # sal_calendar query per matchday inside _matchday_dict.
@@ -961,7 +985,7 @@ def build_router(
         """Brief per-matchday recap for every SETTLED matchday, shown on the
         tournament page: how many players were eliminated, who earned the Big
         Match bonus (+1 life), and whether a tie-break/resurrection happened."""
-        await _get_tournament(tid)
+        await _assert_access(tid, user)
         participants = [p async for p in db.sv_participants.find(
             {"tournament_id": tid},
             {"_id": 0, "user_id": 1, "nickname": 1,
@@ -992,7 +1016,7 @@ def build_router(
 
     @router.get("/tournaments/{tid}/matchdays/current")
     async def current_matchday(tid: str, user: dict = Depends(current_user)):
-        t = await _get_tournament(tid)
+        t = await _assert_access(tid, user)
         md = await db.sv_matchdays.find_one({
             "tournament_id": tid,
             "matchday": t.get("current_matchday", 1),
@@ -1042,7 +1066,7 @@ def build_router(
         )
         if not target:
             raise HTTPException(status_code=404, detail="Partecipante non trovato")
-        t = await _get_tournament(tid)
+        t = await _assert_access(tid, user)
         season = t.get("season") or "2026-27"
         is_self = user_id == user["id"]
 
@@ -1828,7 +1852,7 @@ def build_router(
 
     @router.get("/tournaments/{tid}/leaderboard")
     async def leaderboard(tid: str, user: dict = Depends(current_user)):
-        t = await _get_tournament(tid)
+        t = await _assert_access(tid, user)
         _ = t
         # Find current open matchday (earliest still-open) to flag which
         # participants have already submitted picks for it.
@@ -1933,8 +1957,7 @@ def build_router(
         players must still be able to consult past matchdays.
         """
         PRIVACY_THRESHOLD = 4
-        # No participant check: eliminated users must be able to see the
-        # per-matchday summary of tournaments they took part in.
+        await _assert_access(tid, user)
         md = await db.sv_matchdays.find_one({"id": md_id, "tournament_id": tid}, {"_id": 0})
         if not md:
             raise HTTPException(status_code=404, detail="Giornata non trovata")

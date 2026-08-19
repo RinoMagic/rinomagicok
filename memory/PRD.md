@@ -3,6 +3,11 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Fix — Survival: ingresso SOLO con invito (2026-06, iter 15)
+- **Problema**: `list_tournaments` mostrava TUTTI i tornei a ogni giocatore e gli endpoint di lettura erano aperti → si "entrava" in Survival senza invito (a differenza di Tiket).
+- **Fix** (`surviva.py`): nuovo helper `_assert_access(tid, user)` (admin o partecipante, altrimenti 403). `list_tournaments`/`tournaments_history` filtrano per iscrizione (non-admin vede solo i propri). Gate applicato a: get_tournament, list_participants, list_matchdays, recaps, current_matchday, participant_picks, leaderboard, matchday_summary. Il join resta invite-only (`join_tournament`).
+- Verificato: player non iscritto → lista vuota + 403 su get/current/matchdays; join con codice valido → 200 e accesso ok; codice errato → 404; admin vede tutto.
+
 ## Calendario ripristinato da Excel utente (2026-06, iter 15)
 - Importato il calendario completo dall'Excel utente (`Calendario_SerieA_2026-27`): **380 partite, 38 giornate, tutte con 10 partite e 20 squadre uniche**. Parser custom su fogli ANDATA/RITORNO. Import diretto in `sal_calendar` (wipe stagione + reload). Nuovo torneo su G1 → 10 partite (verificato).
 - **Backup immutabile `sal_calendar_original`**: copia intoccabile del calendario (l'utente vuole che l'originale resti sempre conservato anche se cancella partite). Le 3 giornate con errore nel file (G4/G20/G22) sono state CORRETTE dall'utente e applicate a ENTRAMBI i calendari: G4 Atalanta-Cagliari + Como-Parma; G20 Atalanta-Roma; G22 Monza-Roma. Verifica finale: TUTTE le 38 giornate ok.
