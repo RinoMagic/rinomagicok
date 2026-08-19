@@ -84,7 +84,7 @@ export default function ScoreAndLive() {
       <BonusBanner game="score" />
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#3B82F6]">ScoreAndLive</h1>
+          <h1 className="text-2xl font-extrabold text-[#3B82F6]">ScoreToLive</h1>
           <p className="text-[#94A3B8] text-sm">Indovina i marcatori e sopravvivi giornata dopo giornata.</p>
         </div>
         {isAdmin && (

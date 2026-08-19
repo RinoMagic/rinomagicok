@@ -86,7 +86,7 @@ export default function ScoreAndLiveDetail() {
       });
     }
     try {
-      await apiDownload("/export/pdf", { title: `ScoreAndLive · ${t.name}`, subtitle: `Giornata ${md?.matchday_number ?? ""}`, filename: `scoreandlive_${(t.name || "torneo").replace(/\s+/g, "_")}`, sections }, "scoreandlive.pdf");
+      await apiDownload("/export/pdf", { title: `ScoreToLive · ${t.name}`, subtitle: `Giornata ${md?.matchday_number ?? ""}`, filename: `scoreandlive_${(t.name || "torneo").replace(/\s+/g, "_")}`, sections }, "scoreandlive.pdf");
     } catch (e) { toast.error(e.message); }
   };
   return (

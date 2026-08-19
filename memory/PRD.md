@@ -180,3 +180,4 @@ Verified: testing agent iteration_11 frontend 5/5 (100%). Backend non modificato
 - Punteggi FantaGiornata: scheda "Punteggi" con `total_fantavoto` per membro + breakdown; admin "Calcola punti" (`POST /fg/leagues/{id}/settle`) dai voti caricati.
 - Notifiche Mirate: `BroadcastIn.user_ids` + `broadcast_push` filtrato; componente NotifyBox (admin) in Tiket room, Survival, ScoreAndLive e FantaGiornata invia push solo ai partecipanti dell'entità.
 - Verified: testing agent iteration_5 — backend 11/11, frontend 100% (1 bug critico entries→participants corretto).
+- Branding pre-pubblicazione (2026-06): "TheBestTiket"→"TheBestTicket", "ScoreAndLive"→"ScoreToLive" (solo nomi mostrati; ID interni `thebesttiket`/`scoreandlive` invariati). Logo BARSLOT nell'header (AppShell) ora `object-contain h-8 w-auto` (niente ritaglio). Corretti anche testi "Tiket"→"Ticket" in Bonus/GestioneBonus e titolo PDF ScoreToLive. Verificato via `/api/games`.

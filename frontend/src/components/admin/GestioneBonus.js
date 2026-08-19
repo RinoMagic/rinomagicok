@@ -80,7 +80,7 @@ export default function GestioneBonus() {
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-[#94A3B8]">Tipo
             <select data-testid="gb-type" value={type} onChange={(e) => setType(e.target.value)} className="mt-1 w-full bg-[#0F1216] border border-white/15 rounded-md px-3 py-2 text-sm">
-              <option value="exact_score">Big Match (Tiket + Survival)</option>
+              <option value="exact_score">Big Match (Ticket + Survival)</option>
               <option value="first_scorer">Primo Marcatore (Score + Fanta)</option>
             </select>
           </label>

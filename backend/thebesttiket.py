@@ -62,7 +62,7 @@ TESSERACT_LANG = os.environ.get("TESSERACT_LANG", "ita+eng")
 GAMES: Dict[str, Dict[str, Any]] = {
     "thebesttiket": {
         "id": "thebesttiket",
-        "name": "TheBestTiket",
+        "name": "TheBestTicket",
         "tagline": "Schedine Serie A tra amici",
         "color": "#FFB300",
         "icon": "trophy",
@@ -70,7 +70,7 @@ GAMES: Dict[str, Dict[str, Any]] = {
     },
     "scoreandlive": {
         "id": "scoreandlive",
-        "name": "ScoreAndLive",
+        "name": "ScoreToLive",
         "tagline": "Indovina i marcatori e sopravvivi",
         "color": "#3B82F6",
         "icon": "pulse",

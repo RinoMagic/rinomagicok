@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 
 const SEASON = "2026-27";
 const TABS = [
-  { game: "tiket", label: "Tiket", type: "exact_score" },
+  { game: "tiket", label: "Ticket", type: "exact_score" },
   { game: "survival", label: "Survival", type: "exact_score" },
   { game: "score", label: "Score", type: "first_scorer" },
   { game: "fanta", label: "Fanta", type: "first_scorer" },

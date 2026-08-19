@@ -12,7 +12,7 @@ export default function AppShell({ children }) {
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#0F1216]/70 border-b border-white/10">
         <div className="mx-auto max-w-3xl px-4 h-16 flex items-center gap-3">
           <button data-testid="brand-home" onClick={() => navigate("/")} className="flex items-center gap-3 flex-1 min-w-0">
-            <img src="/barslot-logo.jpg" alt="RinoMagic" className="h-9 w-9 rounded-md object-cover" />
+            <img src="/barslot-logo.jpg" alt="Barslot" className="h-8 w-auto max-w-[110px] rounded-md object-contain bg-black/30 p-0.5" />
             <div className="text-left leading-tight min-w-0">
               <div className="text-lg font-extrabold tracking-wide">RinoMagic</div>
               <div className="text-xs text-[#94A3B8] truncate">Ciao {name}</div>

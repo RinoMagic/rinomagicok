@@ -74,7 +74,7 @@ export default function Tiket() {
 
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#F59E0B]">TheBestTiket</h1>
+          <h1 className="text-2xl font-extrabold text-[#F59E0B]">TheBestTicket</h1>
           <p className="text-[#94A3B8] text-sm">Schedine Serie A tra amici. Chi ha la quota più bassa, paga da bere.</p>
         </div>
         {isAdmin && (
