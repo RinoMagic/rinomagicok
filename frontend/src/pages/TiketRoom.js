@@ -173,17 +173,21 @@ export default function TiketRoom() {
                     {(e.breakdown || []).length === 0 && <div className="text-xs text-[#64748B]">Nessun evento.</div>}
                     {(e.breakdown || []).map((b, j) => {
                       const evaluated = hasResults && b.matched_fixture;
-                      const isWin = b.won && !b.postponed;
-                      const isLose = evaluated && !b.won;
-                      const cls = b.postponed ? "border-white/10 bg-[#0F1216]" : isWin ? "border-[#00D95F]/40 bg-[#00D95F]/10" : isLose ? "border-[#EF4444]/40 bg-[#EF4444]/10" : "border-white/10 bg-[#0F1216]";
+                      const isVoid = !!b.void;                       // stake returned, quota 1.00
+                      const isWin = b.won && !isVoid;                // real win (odd counts)
+                      const isLose = evaluated && !b.won && !isVoid;  // lost
+                      const cls = isVoid ? "border-white/10 bg-[#0F1216]" : isWin ? "border-[#00D95F]/40 bg-[#00D95F]/10" : isLose ? "border-[#EF4444]/40 bg-[#EF4444]/10" : "border-white/10 bg-[#0F1216]";
+                      const voidLabel = b.suspended ? "NULLA" : b.postponed && b.score === "ESCL." ? "ESCL." : "RINV.";
                       return (
                         <div key={j} data-testid={`tkr-event-${e.user_id || i}-${j}`} className={`rounded-lg border p-2.5 text-sm flex items-center gap-2 ${cls}`}>
                           <div className="flex-1 min-w-0">
-                            <div className="truncate">{b.home_team} <span className="text-[#94A3B8]">-</span> {b.away_team}</div>
-                            <div className="text-xs text-[#94A3B8]">Pronostico <b className="text-[#F59E0B]">{b.prediction}</b> @ {b.postponed ? "1.00" : Number(b.odd).toFixed(2)}{b.postponed && <span className="text-[#64748B]"> (orig. {Number(b.odd).toFixed(2)})</span>}</div>
+                            <div className="truncate flex items-center gap-1.5">{b.home_team} <span className="text-[#94A3B8]">-</span> {b.away_team}
+                              {b.suspended && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/40 font-bold shrink-0">SOSPESA</span>}
+                            </div>
+                            <div className="text-xs text-[#94A3B8]">Pronostico <b className="text-[#F59E0B]">{b.prediction}</b> @ {isVoid ? "1.00" : Number(b.odd).toFixed(2)}{isVoid && <span className="text-[#64748B]"> (orig. {Number(b.odd).toFixed(2)})</span>}</div>
                           </div>
                           {b.score && <span className="text-xs text-[#94A3B8]">{b.score}</span>}
-                          {b.postponed ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-[#94A3B8] font-bold">RINV.</span>
+                          {isVoid ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-[#94A3B8] font-bold">{voidLabel}</span>
                             : isWin ? <CheckCircle2 size={16} className="text-[#00D95F]" />
                             : isLose ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EF4444]/25 text-[#EF4444] font-bold">PERSA</span>
                             : <span className="text-[10px] text-[#64748B]">—</span>}

@@ -354,6 +354,59 @@ def _evaluate_prediction(pred: str, fx: dict) -> bool:
     return True
 
 
+def _evaluate_prediction_suspended(pred: str, fx: dict) -> str:
+    """Betting rules for a SUSPENDED match (interrupted with a partial score).
+
+    Returns "win" | "lose" | "void" for the whole combo prediction:
+    * Final-result markets (1 X 2 1X X2 12 and exact score RE-h-a) are ALWAYS
+      void (the final outcome can never be confirmed on suspension).
+    * Markets already MATHEMATICALLY decided by the score at suspension are
+      settled (win/lose); everything still undecided is void.
+    Combo outcome: any losing atom -> "lose"; else if every atom is void ->
+    "void" (stake returned, quota 1.00); otherwise -> "win".
+    """
+    if not pred:
+        return "void"
+    home = int(fx.get("home_score", 0))
+    away = int(fx.get("away_score", 0))
+    total = home + away
+
+    def atom_state(atom: str) -> str:
+        atom = atom.upper().strip()
+        # Exact final score -> void, unless already impossible (lose).
+        m = re.match(r"^RE-(\d+)-(\d+)$", atom)
+        if m:
+            H, A = int(m.group(1)), int(m.group(2))
+            return "lose" if (home > H or away > A) else "void"
+        m = re.match(r"^(MG|MGH|MGA)-(\d)-(\d)(-NO)?$", atom)
+        if m:
+            kind, a, b, no = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
+            value = total if kind == "MG" else (home if kind == "MGH" else away)
+            if no:  # final NOT in [a,b]
+                return "win" if value > b else "void"
+            # SI: final in [a,b]
+            return "lose" if value > b else "void"
+        m = re.match(r"^(OVER|UNDER)-(\d(?:\.\d)?)$", atom)
+        if m:
+            side, thr = m.group(1), float(m.group(2))
+            if side == "OVER":
+                return "win" if total > thr else "void"
+            return "lose" if total > thr else "void"  # UNDER
+        if atom == "GOL":
+            return "win" if (home > 0 and away > 0) else "void"
+        if atom == "NOGOL":
+            return "lose" if (home > 0 and away > 0) else "void"
+        # 1X2 / double chance -> always void on suspension
+        return "void"
+
+    states = [atom_state(a) for a in pred.split("+") if a.strip()]
+    if any(s == "lose" for s in states):
+        return "lose"
+    if all(s == "void" for s in states):
+        return "void"
+    return "win"
+
+
 # =========================================================================
 # OCR pipeline (staryes.it bet slips)
 # =========================================================================
@@ -960,6 +1013,11 @@ class FixtureIn(BaseModel):
     # scored neutrally: every user's prediction is treated as WIN with
     # contribution 1.00 to the schedina ranking (no gain, no loss).
     postponed: Optional[bool] = False
+    # When True, the match was SUSPENDED (interrupted with a partial score):
+    # betting rules apply per market (1X2 void; Over/Gol/etc. settled only if
+    # already mathematically decided). Requires home_score/away_score = score
+    # at the moment of suspension.
+    suspended: Optional[bool] = False
 
 
 class FixturesIn(BaseModel):
@@ -2050,11 +2108,13 @@ def build_router(
                 "away_score": f.away_score,
                 "both_scored": both,
                 "postponed": bool(f.postponed),
+                "suspended": bool(f.suspended),
             })
         if docs:
             await db.fixtures.insert_many(docs)
         return {"ok": True, "count": len(docs),
-                "postponed_count": sum(1 for d in docs if d["postponed"])}
+                "postponed_count": sum(1 for d in docs if d["postponed"]),
+                "suspended_count": sum(1 for d in docs if d["suspended"])}
 
     @router.get("/rooms/{room_id}/fixtures")
     async def get_fixtures(room_id: str, user: dict = Depends(current_user)):
@@ -2272,6 +2332,8 @@ def build_router(
                     "odd": e["odd"],
                     "won": False,
                     "postponed": False,
+                    "suspended": False,
+                    "void": False,
                     "matched_fixture": None,
                     "score": None,
                 }
@@ -2280,6 +2342,7 @@ def build_router(
                     # Excluded match → neutral quota 1.00 (auto-won, no gain).
                     info["won"] = True
                     info["postponed"] = True
+                    info["void"] = True
                     info["matched_fixture"] = f"{excl['home_team']} vs {excl['away_team']}"
                     info["score"] = "ESCL."
                     product *= 1.0
@@ -2292,11 +2355,28 @@ def build_router(
                     if fx:
                         info["matched_fixture"] = f"{fx['home_team']} vs {fx['away_team']}"
                         info["score"] = f"{fx['home_score']}-{fx['away_score']}"
-                        if fx.get("postponed"):
+                        if fx.get("suspended"):
+                            # SUSPENDED match → betting rules per market.
+                            info["suspended"] = True
+                            outcome = _evaluate_prediction_suspended(e["prediction"], fx)
+                            info["score"] = f"{fx['home_score']}-{fx['away_score']} (SOSP.)"
+                            if outcome == "win":
+                                info["won"] = True
+                                product *= e["odd"]
+                                won_count += 1
+                            elif outcome == "void":
+                                # 1X2/undecided → stake returned (quota 1.00).
+                                info["won"] = True
+                                info["void"] = True
+                                product *= 1.0
+                                won_count += 1
+                            # outcome == "lose" → event lost (won stays False)
+                        elif fx.get("postponed"):
                             # Postponed match → prediction is auto-won with
                             # quota 1.00 (neutral contribution to the schedina).
                             info["won"] = True
                             info["postponed"] = True
+                            info["void"] = True
                             info["score"] = "RINV."
                             product *= 1.0
                             won_count += 1

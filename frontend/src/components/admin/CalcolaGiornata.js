@@ -12,7 +12,8 @@ export default function CalcolaGiornata() {
   const [imported, setImported] = useState(false);
   const [preview, setPreview] = useState(null);
   const [edits, setEdits] = useState({});         // key -> {home, away}
-  const [postponed, setPostponed] = useState({}); // key -> bool
+  const [postponed, setPostponed] = useState({}); // key -> bool (rinviata)
+  const [suspended, setSuspended] = useState({}); // key -> bool (sospesa)
   const [fsName, setFsName] = useState("");
   const [fsTeam, setFsTeam] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,18 +51,28 @@ export default function CalcolaGiornata() {
     try {
       const r = await api("/admin/settle-matchday/preview", { method: "POST", body: { matchday: Number(md), season: SEASON } });
       setPreview(r);
-      const e0 = {}; const p0 = {};
+      const e0 = {}; const p0 = {}; const s0 = {};
       (r.fixtures?.list || []).forEach((fx) => {
         e0[key(fx)] = { home: fx.home_score ?? "", away: fx.away_score ?? "" };
         p0[key(fx)] = !!fx.postponed;
+        s0[key(fx)] = !!fx.suspended;
       });
-      setEdits(e0); setPostponed(p0);
+      setEdits(e0); setPostponed(p0); setSuspended(s0);
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); }
   };
 
   const setScore = (k, side, val) => setEdits((p) => ({ ...p, [k]: { ...p[k], [side]: val } }));
-  const togglePost = (k) => setPostponed((p) => ({ ...p, [k]: !p[k] }));
+  const togglePost = (k) => setPostponed((p) => {
+    const nv = !p[k];
+    if (nv) setSuspended((s) => ({ ...s, [k]: false }));
+    return { ...p, [k]: nv };
+  });
+  const toggleSus = (k) => setSuspended((s) => {
+    const nv = !s[k];
+    if (nv) setPostponed((p) => ({ ...p, [k]: false }));
+    return { ...s, [k]: nv };
+  });
 
   const publish = async () => {
     if (!window.confirm(`Pubblicare i risultati e liquidare TUTTI i giochi della giornata ${md}? L'operazione aggiorna vite, punti e classifiche.`)) return;
@@ -69,11 +80,19 @@ export default function CalcolaGiornata() {
     try {
       const list = preview.fixtures?.list || [];
       const postponed_matches = [];
+      const suspended_matches = [];
       const fixture_overrides = [];
       list.forEach((fx) => {
         const k = key(fx);
+        if (fx.excluded) return; // eliminata dal calendario → non conteggiata
         if (postponed[k]) {
           postponed_matches.push({ home_team: fx.home_team, away_team: fx.away_team });
+        } else if (suspended[k]) {
+          const e = edits[k] || {};
+          suspended_matches.push({
+            home_team: fx.home_team, away_team: fx.away_team,
+            home_score: Number(e.home || 0), away_score: Number(e.away || 0),
+          });
         } else {
           const e = edits[k] || {};
           if (e.home !== "" && e.away !== "" && e.home != null && e.away != null) {
@@ -81,7 +100,7 @@ export default function CalcolaGiornata() {
           }
         }
       });
-      const body = { matchday: Number(md), season: SEASON, fixture_overrides, postponed_matches };
+      const body = { matchday: Number(md), season: SEASON, fixture_overrides, postponed_matches, suspended_matches };
       if (fsName.trim()) { body.first_scorer_player_name = fsName.trim(); body.first_scorer_team = fsTeam.trim() || null; }
       const r = await api("/admin/settle-matchday/commit", { method: "POST", body });
       setResult(r);
@@ -128,17 +147,32 @@ export default function CalcolaGiornata() {
               {fixtures.map((fx) => {
                 const k = key(fx);
                 const isP = postponed[k];
+                const isS = suspended[k];
+                const isX = !!fx.excluded;
+                const cls = isX ? "border-white/10 bg-[#0F1216] opacity-60" : isP ? "border-[#EF4444]/40 bg-[#EF4444]/5" : isS ? "border-[#F59E0B]/40 bg-[#F59E0B]/5" : "border-white/10 bg-[#0F1216]";
                 return (
-                  <div key={k} data-testid={`cg-fx-${k}`} className={`rounded-lg border p-2.5 ${isP ? "border-[#EF4444]/40 bg-[#EF4444]/5" : "border-white/10 bg-[#0F1216]"}`}>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 truncate">{fx.home_team} <span className="text-[#94A3B8]">vs</span> {fx.away_team}</span>
-                      <input data-testid={`cg-h-${k}`} type="number" min="0" disabled={isP} value={edits[k]?.home ?? ""} onChange={(e) => setScore(k, "home", e.target.value)} className="w-12 bg-[#181D22] border border-white/15 rounded px-2 py-1 text-center disabled:opacity-40" />
-                      <span className="text-[#94A3B8]">-</span>
-                      <input data-testid={`cg-a-${k}`} type="number" min="0" disabled={isP} value={edits[k]?.away ?? ""} onChange={(e) => setScore(k, "away", e.target.value)} className="w-12 bg-[#181D22] border border-white/15 rounded px-2 py-1 text-center disabled:opacity-40" />
-                      <label className="flex items-center gap-1 text-xs text-[#94A3B8] cursor-pointer ml-1">
-                        <input data-testid={`cg-post-${k}`} type="checkbox" checked={isP} onChange={() => togglePost(k)} /> Rinviata
-                      </label>
+                  <div key={k} data-testid={`cg-fx-${k}`} className={`rounded-lg border p-2.5 ${cls}`}>
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="flex-1 min-w-[140px] truncate">{fx.home_team} <span className="text-[#94A3B8]">vs</span> {fx.away_team}
+                        {isX && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-[#94A3B8] font-bold">ELIMINATA</span>}
+                      </span>
+                      {isX ? (
+                        <span className="text-xs text-[#94A3B8]">Non conteggiata (eliminata dal calendario)</span>
+                      ) : (
+                        <>
+                          <input data-testid={`cg-h-${k}`} type="number" min="0" disabled={isP} value={edits[k]?.home ?? ""} onChange={(e) => setScore(k, "home", e.target.value)} className="w-12 bg-[#181D22] border border-white/15 rounded px-2 py-1 text-center disabled:opacity-40" />
+                          <span className="text-[#94A3B8]">-</span>
+                          <input data-testid={`cg-a-${k}`} type="number" min="0" disabled={isP} value={edits[k]?.away ?? ""} onChange={(e) => setScore(k, "away", e.target.value)} className="w-12 bg-[#181D22] border border-white/15 rounded px-2 py-1 text-center disabled:opacity-40" />
+                          <label className="flex items-center gap-1 text-xs text-[#94A3B8] cursor-pointer ml-1">
+                            <input data-testid={`cg-post-${k}`} type="checkbox" checked={!!isP} onChange={() => togglePost(k)} /> Rinviata
+                          </label>
+                          <label className="flex items-center gap-1 text-xs text-[#F59E0B] cursor-pointer ml-1">
+                            <input data-testid={`cg-sus-${k}`} type="checkbox" checked={!!isS} onChange={() => toggleSus(k)} /> Sospesa
+                          </label>
+                        </>
+                      )}
                     </div>
+                    {isS && <div className="text-[11px] text-[#F8C471] mt-1">Sospesa: inserisci il punteggio al momento dello stop. 1X2 nulli; Over/Gol/Multigol valutati secondo il betting.</div>}
                   </div>
                 );
               })}

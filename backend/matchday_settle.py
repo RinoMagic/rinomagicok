@@ -51,6 +51,11 @@ class SettleInput(BaseModel):
     #   • Score: users who picked this match get their life SAVED
     #   • Fanta: every player of the two teams gets a 6.0 "6 politico"
     postponed_matches: Optional[List[Dict[str, Any]]] = None
+    # Suspended matches — interrupted with a PARTIAL score. Each item is
+    # {home_team, away_team, home_score, away_score} (score at suspension).
+    # Betting rules apply: Tiket settles per-market (1X2 void; Over/Gol/etc.
+    # only if already decided); Survival/Score save the life (1X2 void).
+    suspended_matches: Optional[List[Dict[str, Any]]] = None
 
 
 # =========================================================================
@@ -89,6 +94,7 @@ async def _fixtures_with_scores(
     db, matchday: int, season: str,
     overrides: Optional[List[Dict[str, Any]]] = None,
     postponed: Optional[List[Dict[str, Any]]] = None,
+    suspended: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Return the matchday fixtures from ``sal_calendar`` with their final
     score derived from ``matchday_facts``. Postponed / unreported matches
@@ -122,6 +128,15 @@ async def _fixtures_with_scores(
             post_set.add((_norm(p["home_team"]), _norm(p["away_team"])))
         except (KeyError, TypeError):
             continue
+    sus_map: Dict[tuple, Dict[str, int]] = {}
+    for s in (suspended or []):
+        try:
+            sus_map[(_norm(s["home_team"]), _norm(s["away_team"]))] = {
+                "home_score": int(s.get("home_score") or 0),
+                "away_score": int(s.get("away_score") or 0),
+            }
+        except (KeyError, TypeError, ValueError):
+            continue
     fixtures = []
     async for fx in db.sal_calendar.find(
         {"season": season, "matchday": matchday},
@@ -131,7 +146,13 @@ async def _fixtures_with_scores(
         home = fx["home_team"]
         away = fx["away_team"]
         is_postponed = (_norm(home), _norm(away)) in post_set
-        if is_postponed:
+        sus = sus_map.get((_norm(home), _norm(away)))
+        is_suspended = sus is not None and not is_postponed
+        if is_suspended:
+            home_score = sus["home_score"]
+            away_score = sus["away_score"]
+            manual = True
+        elif is_postponed:
             home_score = None
             away_score = None
             manual = False
@@ -147,8 +168,10 @@ async def _fixtures_with_scores(
                 home_score = h["scored"] if h else None
                 away_score = a["scored"] if a else None
                 manual = False
+        # A suspended match is NOT "played" (no final result) → 1X2 games save
+        # the life; Tiket applies per-market betting rules using the score.
         played = (home_score is not None and away_score is not None
-                  and not is_postponed)
+                  and not is_postponed and not is_suspended)
         fixtures.append({
             "home_team": home,
             "away_team": away,
@@ -157,6 +180,7 @@ async def _fixtures_with_scores(
             "played": played,
             "manual": manual,
             "postponed": is_postponed,
+            "suspended": is_suspended,
             "excluded": bool(fx.get("excluded", False)),
         })
     return fixtures
@@ -294,6 +318,7 @@ def build_router(*, db, require_admin) -> APIRouter:
 
         fixtures = await _fixtures_with_scores(
             db, matchday, season, body.fixture_overrides, body.postponed_matches,
+            body.suspended_matches,
         )
         played = [fx for fx in fixtures if fx["played"]]
         postponed = [fx for fx in fixtures if not fx["played"]]
@@ -379,6 +404,7 @@ def build_router(*, db, require_admin) -> APIRouter:
 
         fixtures = await _fixtures_with_scores(
             db, matchday, season, body.fixture_overrides, body.postponed_matches,
+            body.suspended_matches,
         )
         scorers_map = await _scorers_by_fixture(db, matchday, fixtures)
 
@@ -497,7 +523,17 @@ def build_router(*, db, require_admin) -> APIRouter:
                 for fx in fixtures:
                     if fx.get("excluded"):
                         continue  # Excluded pre-round → do not create schedina event
-                    if fx.get("postponed"):
+                    if fx.get("suspended"):
+                        room_fx.append({
+                            "home_team": fx["home_team"],
+                            "away_team": fx["away_team"],
+                            "home_score": fx["home_score"] or 0,
+                            "away_score": fx["away_score"] or 0,
+                            "both_scored": (fx["home_score"] or 0) > 0
+                                           and (fx["away_score"] or 0) > 0,
+                            "suspended": True,
+                        })
+                    elif fx.get("postponed"):
                         room_fx.append({
                             "home_team": fx["home_team"],
                             "away_team": fx["away_team"],
