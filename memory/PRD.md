@@ -3,6 +3,10 @@
 ## Original Problem
 Rebuild RinoMagic/RinoMagic as a standard React WEB PWA (NOT Expo/Mobile). Port the original FastAPI backend as-is (same routes/rules, incl. web_push.py) and rebuild the frontend in React web replicating the same look & feel and the games (Tiket, Survival, ScoreAndLive, FantaGiornata) + Bonus/Big Match. Connect to existing MongoDB Atlas `schedinabar` in read/write WITHOUT touching existing data (1479 sal_calendar incl. 380 for 2026-27, 497 sal_players, 9 real users). PWA installable, VAPID web push. Never show Expo/QR.
 
+## Fix — Tiket mostra SEMPRE il risultato nella schedina (2026-06, iter 15)
+- **Causa**: nelle stanze Tiket di G2 (test2, doppie) i risultati inseriti erano di G2 ma le schedine caricate contenevano partite di G1 → `_match_prediction_to_fixture` non trovava corrispondenza → tutti "—", totale 0.00.
+- **Fix** (`thebesttiket.py::leaderboard`): oltre ai fixture della stanza, costruisco un POOL GLOBALE di tutti i risultati inseriti (`db.fixtures`, dedotto per home/away, preferendo non-postponed). Ogni evento della schedina cerca prima nei fixture della stanza, poi nel pool globale → il risultato reale + verde(VINTA)/rosso(PERSA)/RINV. viene mostrato sempre che esista da qualche parte. `has_results` ora considera anche il pool globale. Verificato screenshot stanza "Doppia stan2": Udinese-Como 1-4 PERSA, Atalanta-Sassuolo RINV., Parma-Cagliari 1-2 PERSA, Genoa-Napoli 0-1 PERSA (solo Inter-Monza "—", risultato mai inserito).
+
 ## Fix — Risultato reale nel dettaglio giocata Survival (2026-06, iter 15)
 - Come in Tiket, il dettaglio giocata (tocca un giocatore in Classifica) ora mostra per ogni pronostico il RISULTATO reale della partita accanto al segno verde(preso)/rosso(sbagliato). `SurvivaPicksModal.js`: badge "home-away" usando `home_score`/`away_score` (già salvati sui pick al settle); partite sospese mostrano "—". Nota: ScoreAndLive e FantaGiornata sono disabilitati (hub: solo thebesttiket + surviva), quindi i due giochi attivi mostrano entrambi pronostico+risultato+esito. Verificato screenshot: G2 1-1/0-1 rossi, Fiorentina-Frosinone SOSPESA verde, G4 1-2 rosso.
 

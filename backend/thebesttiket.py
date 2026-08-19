@@ -2240,6 +2240,24 @@ def build_router(
         schedine_cur = db.schedine.find(
             {"room_id": room_id, "status": "confirmed"}, {"_id": 0},
         )
+
+        # GLOBAL results pool (fix "mostra SEMPRE il risultato"): a schedina
+        # may contain matches whose result was entered in another room /
+        # matchday. We therefore fall back to a season-wide pool of ALL
+        # entered fixtures (deduped by home/away) when the room's own
+        # fixtures don't contain the event. Each Serie A pairing is unique
+        # within a matchday so the lookup is unambiguous in practice.
+        global_by_key: Dict[Tuple[str, str], dict] = {}
+        async for gf in db.fixtures.find({}, {"_id": 0}):
+            key = ((gf.get("home_team") or "").strip().lower(),
+                   (gf.get("away_team") or "").strip().lower())
+            # Prefer a non-postponed result if duplicates exist.
+            prev = global_by_key.get(key)
+            if prev is None or (prev.get("postponed") and not gf.get("postponed")):
+                global_by_key[key] = gf
+        global_fixtures = list(global_by_key.values())
+        any_results = has_results or len(global_fixtures) > 0
+
         entries = []
         async for s in schedine_cur:
             events = s.get("events", [])
@@ -2266,8 +2284,11 @@ def build_router(
                     info["score"] = "ESCL."
                     product *= 1.0
                     won_count += 1
-                elif has_results:
-                    fx = _match_prediction_to_fixture(e, fixtures)
+                else:
+                    # Room fixtures first, then season-wide pool fallback so
+                    # the result is ALWAYS shown when it exists anywhere.
+                    fx = _match_prediction_to_fixture(e, fixtures) or \
+                        _match_prediction_to_fixture(e, global_fixtures)
                     if fx:
                         info["matched_fixture"] = f"{fx['home_team']} vs {fx['away_team']}"
                         info["score"] = f"{fx['home_score']}-{fx['away_score']}"
@@ -2297,8 +2318,8 @@ def build_router(
         for i, r in enumerate(entries):
             r["rank"] = i + 1
         return {
-            "has_results": has_results,
-            "settled": has_results and len(entries) > 0,
+            "has_results": any_results,
+            "settled": any_results and len(entries) > 0,
             "leaderboard": entries,
         }
 
