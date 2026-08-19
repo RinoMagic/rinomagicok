@@ -85,6 +85,7 @@ export function SurvivaPicksModal({ tid, row, onClose }) {
                     // and green — unlike postponed. Only correct===false is red.
                     const outcome = md.settled ? (p.correct === false ? "ko" : "ok") : "na";
                     const suspended = md.settled && (p.correct === null || p.correct === undefined);
+                    const hasScore = md.settled && p.home_score !== null && p.home_score !== undefined && p.away_score !== null && p.away_score !== undefined;
                     return (
                       <div key={i} className="flex items-center gap-2 py-1">
                         <span className="flex-1 min-w-0 truncate text-sm flex items-center gap-1.5">
@@ -92,6 +93,11 @@ export function SurvivaPicksModal({ tid, row, onClose }) {
                           {p.auto_generated && <span title="Giocata di default assegnata automaticamente" className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-[#94A3B8] font-bold shrink-0">AUTO</span>}
                           {suspended && <span title="Partita sospesa: giocata valida" className="text-[9px] px-1.5 py-0.5 rounded bg-[#00D95F]/15 text-[#00D95F] border border-[#00D95F]/40 font-bold shrink-0">SOSPESA</span>}
                         </span>
+                        {hasScore ? (
+                          <span data-testid={`sv-pick-result-${i}`} title="Risultato finale" className="min-w-11 text-center px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-xs font-bold text-[#94A3B8] shrink-0">{p.home_score}-{p.away_score}</span>
+                        ) : suspended ? (
+                          <span className="min-w-11 text-center text-xs text-[#94A3B8] shrink-0">—</span>
+                        ) : null}
                         <span className={`min-w-7 text-center px-2 py-0.5 rounded border text-sm font-extrabold ${outcome === "ok" ? "border-[#00D95F] bg-[#00D95F]/15 text-[#00D95F]" : outcome === "ko" ? "border-[#EF4444] bg-[#EF4444]/15 text-[#EF4444]" : "border-white/15 text-white"}`}>{p.pick}</span>
                         <span className="w-6 flex items-center justify-center">
                           {outcome === "ok" && <CheckCircle2 size={18} className="text-[#00D95F]" />}
